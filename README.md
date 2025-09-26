@@ -20,7 +20,7 @@ SECRET_KEY=your-secret-key-here
 DEBUG=False
 ALLOWED_HOSTS=your-render-app.onrender.com,localhost
 DATABASE_URL=postgresql://user:password@host:port/database
-CORS_ALLOWED_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:8080
+CORS_ALLOWED_ORIGINS=https://jeeva-ai-phi.vercel.app/,http://localhost:8080
 GEMINI_API_KEY=your-gemini-api-key
 ```
 
