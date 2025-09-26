@@ -149,3 +149,18 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 CORS_ALLOW_METHODS = list(default_methods) + ['PATCH']
 
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # required for collectstatic
+
+# (Optional, but recommended)
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+
+# For whitenoise (serves static files in production)
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
