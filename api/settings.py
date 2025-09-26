@@ -26,7 +26,13 @@ SECRET_KEY = 'django-insecure-ij$)^rkz1j311-tqbs$m&^bbwn%x)whm1=y&)nn&da5f0960w$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "jeeva-ai-backend-sodx.onrender.com",   # backend
+    "your-frontend-name.vercel.app",        # frontend on vercel
+]
+
 
 
 # Application definition
