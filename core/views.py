@@ -36,11 +36,34 @@ class ProfileViewSet(viewsets.ViewSet):
         email = request.headers.get("X-User-Email") or request.data.get("email")
         if not email:
             return Response({"detail": "email required"}, status=400)
-        profile, _ = Profile.objects.get_or_create(email=email)
-        serializer = ProfileSerializer(profile, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        
+        # Get or create profile with provided data
+        profile, created = Profile.objects.get_or_create(
+            email=email, 
+            defaults={
+                "first_name": request.data.get("first_name", ""),
+                "last_name": request.data.get("last_name", ""),
+                "role": request.data.get("role", "patient"),
+                "phone": request.data.get("phone", ""),
+            }
+        )
+        
+        # If profile already exists, update it
+        if not created:
+            serializer = ProfileSerializer(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                return Response(serializer.errors, status=400)
+        else:
+            # For new profiles, validate the data
+            serializer = ProfileSerializer(profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                return Response(serializer.errors, status=400)
+        
+        return Response(ProfileSerializer(profile).data)
 
 
 class HealthRecordViewSet(viewsets.ModelViewSet):
