@@ -99,8 +99,13 @@ if os.environ.get('DATABASE_URL'):
     DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
     print("Using production database from DATABASE_URL")
 else:
-    # Fallback for development
-    print("Warning: DATABASE_URL not found, using local database configuration")
+    # Fallback for development - only use local config if not in production
+    if os.environ.get('RENDER'):
+        print("ERROR: DATABASE_URL not found in production environment!")
+        print("Please ensure you have created a PostgreSQL database and set DATABASE_URL")
+        raise Exception("DATABASE_URL environment variable is required in production")
+    else:
+        print("Warning: DATABASE_URL not found, using local database configuration")
 
 
 # Password validation
