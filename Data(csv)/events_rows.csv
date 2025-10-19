@@ -1,0 +1,3 @@
+id,title,description,start_time,end_time,event_type,status,doctor_id,patient_id,notes,is_available,created_at,updated_at
+96ea8571-e2d5-4583-b225-c8a4c99f1812,meet,,2025-11-02 10:32:00+00,2025-11-02 11:02:00+00,meeting,confirmed,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,,,false,2025-10-02 08:32:22.248968+00,2025-10-02 08:32:22.248968+00
+c3da4326-7fa9-4781-b2fd-20bca317e810,meet,,2025-10-02 10:30:00+00,2025-10-02 11:00:00+00,meeting,pending,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,,,false,2025-10-02 08:39:38.613853+00,2025-10-02 08:39:38.613853+00

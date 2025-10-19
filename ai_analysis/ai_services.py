@@ -1,15 +1,20 @@
 import base64
 import io
 import json
+import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
 from PIL import Image
 import google.generativeai as genai
 from firecrawl import FirecrawlApp, V1ScrapeOptions
 from django.conf import settings
+from .medical_report_scanner import MedicalReportScanner
 
 
 # Initialize AI clients (exact same as original model)
@@ -368,6 +373,78 @@ def generate_predictive_insights_from_medicines(medicine_names: List[str]) -> Di
 
     except Exception as e:
         raise Exception(f"Error generating predictive insights: {str(e)}")
+
+
+def analyze_medical_report_with_scanner(file_data, file_name: str) -> Dict:
+    """Analyze medical report using the MedicalReportScanner"""
+    try:
+        # Check if Gemini API key is available
+        if not settings.GEMINI_API_KEY:
+            raise ValueError("Gemini API key not configured")
+        
+        # Initialize the medical report scanner
+        scanner = MedicalReportScanner(settings.GEMINI_API_KEY)
+        
+        # Process the uploaded file
+        extracted_text = scanner.process_uploaded_file(file_data)
+        
+        if not extracted_text or len(extracted_text.strip()) < 10:
+            raise ValueError("Could not extract sufficient text from the file")
+        
+        # Try complex AI analysis first, with timeout handling
+        try:
+            # Parse medical data
+            parsed_data = scanner.parse_medical_data(extracted_text)
+            
+            # Generate diagnosis insights
+            diagnosis = scanner.analyze_diagnosis(parsed_data)
+            
+            # Generate comprehensive report
+            detailed_report = scanner.generate_comprehensive_report(parsed_data, diagnosis)
+        except Exception as ai_error:
+            # Fallback to simple analysis if AI analysis fails
+            logger.warning(f"AI analysis failed, using simple analysis: {ai_error}")
+            from .simple_medical_analysis import simple_medical_analysis
+            return simple_medical_analysis(extracted_text, file_name)
+        
+        # Format the response to match the expected structure
+        return {
+            "summary": diagnosis.get('summary', 'Comprehensive medical report analysis completed.'),
+            "keyFindings": [
+                f"**Medical Report Analysis**: {file_name} - Comprehensive lab report evaluation completed",
+                f"**Test Categories**: {len(parsed_data.get('test_categories', []))} categories analyzed",
+                f"**Patient Information**: {parsed_data.get('patient_info', {}).get('name', 'Not specified')}",
+                f"**Risk Assessment**: Overall risk level - {diagnosis.get('risk_assessment', {}).get('overall_risk', 'moderate')}",
+                f"**Analysis Type**: Comprehensive Medical Lab Report Analysis"
+            ],
+            "riskWarnings": diagnosis.get('red_flags', []) + [
+                "⚠️ **Medical Disclaimer**: This AI analysis is for informational purposes only",
+                "⚠️ **Professional Consultation**: Always consult with qualified healthcare professionals",
+                "⚠️ **Critical Values**: Review any critical findings with your healthcare provider immediately"
+            ],
+            "recommendations": [
+                rec.get('recommendation', '') for rec in diagnosis.get('recommendations', [])
+            ] + [
+                "💡 **Follow-up Tests**: " + test for test in diagnosis.get('follow_up_tests', [])
+            ],
+            "predictiveInsights": [
+                f"**Overall Health Risk**: {diagnosis.get('risk_assessment', {}).get('overall_risk', 'moderate').title()}",
+                f"**Cardiovascular Risk**: {diagnosis.get('risk_assessment', {}).get('cardiovascular_risk', 'moderate').title()}",
+                f"**Diabetes Risk**: {diagnosis.get('risk_assessment', {}).get('diabetes_risk', 'moderate').title()}",
+                f"**Potential Conditions**: {len(diagnosis.get('potential_conditions', []))} conditions identified for discussion"
+            ],
+            "confidence": 0.85,
+            "analysisType": "Comprehensive Medical Report Analysis",
+            "detailedReport": detailed_report,
+            "medicineNames": [],  # Not applicable for lab reports
+            "disclaimer": "This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals.",
+            "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.",
+            "parsedData": parsed_data,
+            "diagnosis": diagnosis
+        }
+        
+    except Exception as e:
+        raise Exception(f"Error analyzing medical report: {str(e)}")
 
 
 def analyze_health_record_with_ai(record_data: Dict) -> Dict:

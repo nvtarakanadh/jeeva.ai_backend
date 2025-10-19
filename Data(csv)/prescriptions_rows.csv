@@ -1,0 +1,5 @@
+id,patient_id,doctor_id,title,description,medication,dosage,frequency,duration,instructions,prescription_date,file_url,file_name,created_at,updated_at
+41bcd0e7-5e6f-407e-840c-7f5a361812c5,889ae532-a602-433b-88b9-cd0323913135,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,notification testing,,dolo,650mg,Twice daily,5 days,,2025-09-30,,,2025-09-30 11:57:43.6116+00,2025-09-30 11:57:43.6116+00
+5c9534b1-c789-477d-b119-a67180e4be10,e609cdf5-1da8-4bfe-9e29-4313a474d3ab,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,stress,sleep reqularly,sleep,1000,Three times daily,5 days,sleep properly,2025-09-30,,,2025-09-30 07:51:25.148296+00,2025-09-30 08:15:50.663307+00
+97e5bc39-b6a7-46b0-8aa3-5c8f69a5bd3f,e609cdf5-1da8-4bfe-9e29-4313a474d3ab,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,stress,,sleep,1000mg,As needed,5 days,,2025-09-30,,,2025-09-30 07:34:53.722433+00,2025-09-30 07:34:53.722433+00
+ec501e2d-8f22-4706-a0a5-bc5382b81a41,889ae532-a602-433b-88b9-cd0323913135,4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,notification testing,,dolo,650mg,Twice daily,5 days,,2025-09-30,,,2025-09-30 11:57:43.494194+00,2025-09-30 11:57:43.494194+00

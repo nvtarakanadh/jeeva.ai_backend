@@ -15,7 +15,7 @@ from .serializers import (
     HealthRecordAnalysisRequestSerializer,
     MedicineAnalysisRequestSerializer
 )
-from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines
+from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner
 
 
 @api_view(['POST'])
@@ -306,6 +306,83 @@ def health_check(request):
         'timestamp': timezone.now().isoformat()
     }, status=status.HTTP_200_OK)
 
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def analyze_medical_report(request):
+    """Analyze medical report (PDF or image) using the MedicalReportScanner"""
+    try:
+        # Get the uploaded file
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response(
+                {'error': 'No file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get other parameters
+        title = request.data.get('title', 'Medical Report Analysis')
+        description = request.data.get('description', '')
+        patient_id = request.data.get('patient_id', 'unknown')
+        uploaded_by = request.data.get('uploaded_by', 'system')
+        
+        # Debug: Log file information
+        print(f"🔍 DEBUG: File name: {uploaded_file.name}")
+        print(f"🔍 DEBUG: File size: {uploaded_file.size}")
+        print(f"🔍 DEBUG: File content type: {uploaded_file.content_type}")
+        
+        # Analyze medical report using the scanner
+        analysis_result = analyze_medical_report_with_scanner(uploaded_file, uploaded_file.name)
+        
+        # Create or get health record
+        record_id = str(uuid.uuid4())
+        health_record = HealthRecord.objects.create(
+            id=record_id,
+            patient_id=patient_id,
+            record_type='lab_test',
+            title=title,
+            description=description,
+            file_name=uploaded_file.name,
+            file_type=uploaded_file.content_type,
+            record_date=timezone.now(),
+            uploaded_by=uploaded_by
+        )
+        
+        # Create AI analysis
+        ai_analysis = AIAnalysis.objects.create(
+            record_id=record_id,
+            summary=analysis_result['summary'],
+            key_findings=analysis_result['keyFindings'],
+            risk_warnings=analysis_result['riskWarnings'],
+            recommendations=analysis_result['recommendations'],
+            predictive_insights=analysis_result.get('predictiveInsights', []),
+            detailed_report=analysis_result.get('detailedReport', ''),
+            medicine_names=analysis_result.get('medicineNames', []),
+            disclaimer=analysis_result.get('disclaimer', ''),
+            ai_disclaimer=analysis_result.get('aiDisclaimer', ''),
+            confidence=analysis_result['confidence'],
+            analysis_type=analysis_result['analysisType'],
+            record_title=health_record.title
+        )
+        
+        # Return the analysis result
+        analysis_data = AIAnalysisSerializer(ai_analysis).data
+        analysis_data['ai_disclaimer'] = analysis_result.get('aiDisclaimer', '')
+        
+        return Response({
+            'success': True,
+            'record_id': record_id,
+            'analysis': analysis_data,
+            'health_record': HealthRecordSerializer(health_record).data,
+            'ai_disclaimer': analysis_result.get('aiDisclaimer', '⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.')
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Medical report analysis failed: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET'])
 def test_response_structure(request):
     """Test endpoint to check response structure"""
@@ -340,3 +417,207 @@ def test_response_structure(request):
         'analysis': mock_analysis,
         'ai_disclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
     })
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def upload_prescription_file(request):
+    """Upload prescription file (image or PDF)"""
+    try:
+        # Get the uploaded file
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {'error': 'No file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+        if file.content_type not in allowed_types:
+            return Response(
+                {'error': 'Invalid file type. Only JPEG, PNG, and PDF files are allowed.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get form data
+        patient_id = request.data.get('patient_id')
+        doctor_id = request.data.get('doctor_id')
+        consultation_id = request.data.get('consultation_id')
+        description = request.data.get('description', '')
+        
+        if not patient_id or not doctor_id:
+            return Response(
+                {'error': 'patient_id and doctor_id are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine file type
+        file_type = 'pdf' if file.content_type == 'application/pdf' else 'image'
+        
+        # Create prescription file record
+        from .models import PrescriptionFile
+        prescription_file = PrescriptionFile.objects.create(
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            consultation_id=consultation_id,
+            file_name=file.name,
+            file_type=file_type,
+            file_url=f'/media/prescriptions/{file.name}',  # This would be updated with actual storage URL
+            file_size=file.size,
+            description=description
+        )
+        
+        # Here you would typically save the file to your storage system
+        # For now, we'll just return the created record
+        
+        return Response({
+            'success': True,
+            'file_id': str(prescription_file.id),
+            'file_name': prescription_file.file_name,
+            'file_type': prescription_file.file_type,
+            'file_size': prescription_file.file_size,
+            'created_at': prescription_file.created_at
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to upload file: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def upload_consultation_note_file(request):
+    """Upload consultation note file (image or PDF)"""
+    try:
+        # Get the uploaded file
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {'error': 'No file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+        if file.content_type not in allowed_types:
+            return Response(
+                {'error': 'Invalid file type. Only JPEG, PNG, and PDF files are allowed.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get form data
+        patient_id = request.data.get('patient_id')
+        doctor_id = request.data.get('doctor_id')
+        consultation_id = request.data.get('consultation_id')
+        description = request.data.get('description', '')
+        
+        if not patient_id or not doctor_id:
+            return Response(
+                {'error': 'patient_id and doctor_id are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine file type
+        file_type = 'pdf' if file.content_type == 'application/pdf' else 'image'
+        
+        # Create consultation note file record
+        from .models import ConsultationNoteFile
+        consultation_file = ConsultationNoteFile.objects.create(
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            consultation_id=consultation_id,
+            file_name=file.name,
+            file_type=file_type,
+            file_url=f'/media/consultation-notes/{file.name}',  # This would be updated with actual storage URL
+            file_size=file.size,
+            description=description
+        )
+        
+        # Here you would typically save the file to your storage system
+        # For now, we'll just return the created record
+        
+        return Response({
+            'success': True,
+            'file_id': str(consultation_file.id),
+            'file_name': consultation_file.file_name,
+            'file_type': consultation_file.file_type,
+            'file_size': consultation_file.file_size,
+            'created_at': consultation_file.created_at
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to upload file: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+def get_prescription_files(request, patient_id):
+    """Get all prescription files for a patient"""
+    try:
+        from .models import PrescriptionFile
+        
+        files = PrescriptionFile.objects.filter(patient_id=patient_id).order_by('-created_at')
+        
+        file_data = []
+        for file in files:
+            file_data.append({
+                'id': str(file.id),
+                'file_name': file.file_name,
+                'file_type': file.file_type,
+                'file_url': file.file_url,
+                'file_size': file.file_size,
+                'description': file.description,
+                'doctor_id': str(file.doctor_id),
+                'consultation_id': str(file.consultation_id) if file.consultation_id else None,
+                'created_at': file.created_at
+            })
+        
+        return Response({
+            'success': True,
+            'files': file_data
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get prescription files: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+def get_consultation_note_files(request, patient_id):
+    """Get all consultation note files for a patient"""
+    try:
+        from .models import ConsultationNoteFile
+        
+        files = ConsultationNoteFile.objects.filter(patient_id=patient_id).order_by('-created_at')
+        
+        file_data = []
+        for file in files:
+            file_data.append({
+                'id': str(file.id),
+                'file_name': file.file_name,
+                'file_type': file.file_type,
+                'file_url': file.file_url,
+                'file_size': file.file_size,
+                'description': file.description,
+                'doctor_id': str(file.doctor_id),
+                'consultation_id': str(file.consultation_id) if file.consultation_id else None,
+                'created_at': file.created_at
+            })
+        
+        return Response({
+            'success': True,
+            'files': file_data
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get consultation note files: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
