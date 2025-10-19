@@ -97,6 +97,10 @@ DATABASES = {
 # Production database configuration
 if os.environ.get('DATABASE_URL'):
     DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
+    print("Using production database from DATABASE_URL")
+else:
+    # Fallback for development
+    print("Warning: DATABASE_URL not found, using local database configuration")
 
 
 # Password validation
