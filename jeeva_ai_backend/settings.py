@@ -41,14 +41,16 @@ ALLOWED_HOSTS = [
     '*',  # Allow all hosts in production (temporary for debugging)
 ]
 
-# If environment variable is set, use it instead
-if os.getenv('ALLOWED_HOSTS'):
-    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
+# BULLETPROOF: Ignore environment variable override for now
+# The environment variable has the wrong domain name
+# if os.getenv('ALLOWED_HOSTS'):
+#     ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
 
 # Debug logging for production troubleshooting
 print(f"🔧 ALLOWED_HOSTS configured as: {ALLOWED_HOSTS}")
 print(f"🔧 Environment ALLOWED_HOSTS: {os.getenv('ALLOWED_HOSTS', 'Not set')}")
 print(f"🔧 DEBUG mode: {DEBUG}")
+print(f"🔧 Using bulletproof configuration (ignoring env var)")
 
 
 # Application definition
