@@ -171,6 +171,8 @@ REST_FRAMEWORK = {
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "https://jeeva-ai-frontend-gamma.vercel.app",
+    "https://jeeva-ai-frontend.vercel.app",
+    "https://jeeva-ai.vercel.app",
     "http://localhost:8080",
     "http://127.0.0.1:8080", 
     "http://localhost:3000",
