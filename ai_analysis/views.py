@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.utils import timezone
+from django.http import JsonResponse
 from datetime import datetime
 import uuid
 import requests
@@ -17,6 +18,14 @@ from .serializers import (
     MedicineAnalysisRequestSerializer
 )
 from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner
+
+# Custom response function with CORS headers
+def cors_response(data, status_code=200):
+    response = Response(data, status=status_code)
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
 
 
 @api_view(['POST'])

@@ -3,7 +3,7 @@ services:
     name: jeeva-ai-backend
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py migrate
-    startCommand: gunicorn jeeva_ai_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: gunicorn jeeva_ai_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 300
     envVars:
       - key: SECRET_KEY
         value: fc+wt)r77c6kkwosf@(%q=zddf@t*bvt(@s6e#_r2rudp4@5f8
