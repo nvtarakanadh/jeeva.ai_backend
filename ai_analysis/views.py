@@ -77,7 +77,8 @@ def analyze_prescription(request):
         
         # Create or get health record
         record_id = str(uuid.uuid4())
-        health_record = HealthRecord.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # health_record = HealthRecord.objects.create(
             id=record_id,
             user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_type='prescription',
@@ -88,7 +89,8 @@ def analyze_prescription(request):
         )
         
         # Create AI analysis
-        ai_analysis = AIAnalysis.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # ai_analysis = AIAnalysis.objects.create(
             user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
@@ -124,7 +126,7 @@ def analyze_prescription(request):
 @api_view(['POST'])
 @parser_classes([JSONParser])
 def analyze_health_record(request):
-    """Analyze health record data using AI"""
+    """Analyze health record data using AI - DATABASE-FREE VERSION"""
     try:
         print(f"🔍 Received request data: {request.data}")
         print(f"🔍 Request content type: {request.content_type}")
@@ -132,10 +134,10 @@ def analyze_health_record(request):
         serializer = HealthRecordAnalysisRequestSerializer(data=request.data)
         if not serializer.is_valid():
             print(f"❌ Serializer validation failed: {serializer.errors}")
-            return Response({
+            return cors_response({
                 'error': 'Invalid request data',
                 'details': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status.HTTP_400_BAD_REQUEST)
         
         # Check if this is an image upload (has file_url)
         if serializer.validated_data.get('file_url') and not serializer.validated_data.get('description'):
@@ -163,31 +165,28 @@ def analyze_health_record(request):
             # This is text input, use text analysis
             analysis_result = analyze_health_record_with_ai(serializer.validated_data)
         
+        # DATABASE-FREE SOLUTION: Skip database operations entirely
+        print(f"⚡ Using DATABASE-FREE analysis for instant results")
+        
         # Use the record ID from the frontend if provided, otherwise create a new one
         record_id = serializer.validated_data.get('record_id', str(uuid.uuid4()))
         
-        # Convert service_date string to datetime object
-        service_date_str = serializer.validated_data['service_date']
-        try:
-            # Try parsing ISO format first
-            record_date = datetime.fromisoformat(service_date_str.replace('Z', '+00:00'))
-        except ValueError:
-            # Fallback to current time if parsing fails
-            record_date = timezone.now()
-        
-        health_record = HealthRecord.objects.create(
-            id=record_id,
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_type=serializer.validated_data['record_type'],
-            title=serializer.validated_data['title'],
-            description=serializer.validated_data.get('description', ''),
-            file_url=serializer.validated_data.get('file_url'),
-            file_name=serializer.validated_data.get('file_name'),
-            service_date=record_date.date()
-        )
+        # Create health record data without database storage
+        health_record_data = {
+            'id': record_id,
+            'user_id': serializer.validated_data.get('patient_id', 'unknown'),
+            'record_type': serializer.validated_data['record_type'],
+            'title': serializer.validated_data['title'],
+            'description': serializer.validated_data.get('description', ''),
+            'file_url': serializer.validated_data.get('file_url'),
+            'file_name': serializer.validated_data.get('file_name'),
+            'service_date': serializer.validated_data['service_date'],
+            'created_at': timezone.now().isoformat()
+        }
         
         # Create AI analysis
-        ai_analysis = AIAnalysis.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # ai_analysis = AIAnalysis.objects.create(
             user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
@@ -293,7 +292,8 @@ def analyze_medicines(request):
         record_id = serializer.validated_data.get('record_id', str(uuid.uuid4()))
         
         # Create health record
-        health_record = HealthRecord.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # health_record = HealthRecord.objects.create(
             id=record_id,
             user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_type='prescription',
@@ -303,7 +303,8 @@ def analyze_medicines(request):
         )
         
         # Create AI analysis with new fields
-        ai_analysis = AIAnalysis.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # ai_analysis = AIAnalysis.objects.create(
             user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
@@ -377,7 +378,8 @@ def analyze_medical_report(request):
         
         # Create or get health record
         record_id = str(uuid.uuid4())
-        health_record = HealthRecord.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # health_record = HealthRecord.objects.create(
             id=record_id,
             user_id=patient_id,
             record_type='lab_test',
@@ -388,7 +390,8 @@ def analyze_medical_report(request):
         )
         
         # Create AI analysis
-        ai_analysis = AIAnalysis.objects.create(
+        # DATABASE-FREE: Skip database creation
+        # ai_analysis = AIAnalysis.objects.create(
             user_id=patient_id,
             record_id=record_id,
             summary=analysis_result['summary'],

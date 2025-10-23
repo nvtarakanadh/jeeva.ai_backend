@@ -1,9 +1,10 @@
 from django.urls import path
 from . import views
+from . import simple_views
 
 urlpatterns = [
     path('analyze/prescription/', views.analyze_prescription, name='analyze_prescription'),
-    path('analyze/health-record/', views.analyze_health_record, name='analyze_health_record'),
+    path('analyze/health-record/', simple_views.analyze_health_record_simple, name='analyze_health_record'),
     path('analyze/medical-report/', views.analyze_medical_report, name='analyze_medical_report'),
     path('analyze/medicines/', views.analyze_medicines, name='analyze_medicines'),
     path('analysis/<str:record_id>/', views.get_analysis, name='get_analysis'),
