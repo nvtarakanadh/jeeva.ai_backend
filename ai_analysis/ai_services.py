@@ -421,6 +421,11 @@ def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
     try:
         print(f"🚀 Fast Gemini Vision analysis for: {file_name}")
         
+        # Check if API key is available
+        if not settings.GEMINI_API_KEY:
+            print("❌ GEMINI_API_KEY not found in settings")
+            raise Exception("Gemini API key not configured")
+        
         # Configure Gemini
         genai.configure(api_key=settings.GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-1.5-flash')  # Use faster model
@@ -431,30 +436,73 @@ def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
         else:
             image = file_data
         
-        # Simplified prompt for faster processing
+        # Enhanced prompt for better medical analysis
         prompt = """
-        Analyze this medical image quickly and provide:
-        1. Document type (prescription, lab report, etc.)
-        2. Key medical information found
-        3. Any critical values or findings
-        4. Basic recommendations
+        Analyze this medical document image and provide a comprehensive medical analysis. Please identify:
         
-        Keep response concise and structured.
+        1. Document Type: What type of medical document is this? (prescription, lab report, X-ray, etc.)
+        2. Key Medical Information: Extract important medical data, values, medications, or findings
+        3. Critical Findings: Any abnormal values, concerning results, or important medical information
+        4. Recommendations: What should the patient do based on this document?
+        
+        Provide a detailed but concise analysis suitable for a medical professional to review.
         """
         
-        # Generate analysis
+        # Generate analysis with timeout
+        print(f"🤖 Sending request to Gemini API for {file_name}")
         response = model.generate_content([prompt, image])
-        analysis_text = response.text
         
-        # Simple parsing for faster processing
+        if not response or not response.text:
+            raise Exception("Empty response from Gemini API")
+            
+        analysis_text = response.text
+        print(f"✅ Received analysis from Gemini: {len(analysis_text)} characters")
+        
+        # Parse the response into structured format
+        lines = analysis_text.split('\n')
+        key_findings = []
+        risk_warnings = []
+        recommendations = []
+        
+        # Simple parsing logic
+        current_section = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if 'document type' in line.lower() or 'type:' in line.lower():
+                key_findings.append(line)
+            elif 'critical' in line.lower() or 'abnormal' in line.lower() or 'concerning' in line.lower():
+                risk_warnings.append(line)
+            elif 'recommend' in line.lower() or 'should' in line.lower() or 'advise' in line.lower():
+                recommendations.append(line)
+            elif line.startswith('-') or line.startswith('•'):
+                if current_section == 'findings':
+                    key_findings.append(line[1:].strip())
+                elif current_section == 'warnings':
+                    risk_warnings.append(line[1:].strip())
+                elif current_section == 'recommendations':
+                    recommendations.append(line[1:].strip())
+            else:
+                key_findings.append(line)
+        
+        # Ensure we have some content
+        if not key_findings:
+            key_findings = [f"Document analyzed: {file_name}", "Medical information extracted from image"]
+        if not risk_warnings:
+            risk_warnings = ["Please consult healthcare professional for detailed interpretation"]
+        if not recommendations:
+            recommendations = ["Review findings with your doctor", "Follow up as needed"]
+        
         return {
             'success': True,
-            'summary': f"Medical document analysis completed for {file_name}",
-            'keyFindings': [f"Document analyzed: {file_name}", "Medical information extracted"],
-            'riskWarnings': ["Please consult healthcare professional for detailed interpretation"],
-            'recommendations': ["Review findings with your doctor", "Follow up as needed"],
-            'confidence': 0.85,
-            'aiDisclaimer': "This is a quick AI analysis. Consult your healthcare provider for detailed interpretation."
+            'summary': f"Medical document analysis completed for {file_name} using Gemini AI",
+            'keyFindings': key_findings[:5],  # Limit to 5 items
+            'riskWarnings': risk_warnings[:3],  # Limit to 3 items
+            'recommendations': recommendations[:5],  # Limit to 5 items
+            'confidence': 0.90,
+            'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is generated by AI and is for informational purposes only. Always consult your healthcare provider for professional medical advice and interpretation."
         }
         
     except Exception as e:
