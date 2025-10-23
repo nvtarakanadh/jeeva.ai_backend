@@ -3,11 +3,12 @@ from . import views
 from . import simple_views
 from . import cors_fix
 from . import health_fix
+from . import medical_report_cors_fix
 
 urlpatterns = [
     path('analyze/prescription/', views.analyze_prescription, name='analyze_prescription'),
     path('analyze/health-record/', cors_fix.analyze_health_record_cors_fix, name='analyze_health_record'),
-    path('analyze/medical-report/', views.analyze_medical_report, name='analyze_medical_report'),
+    path('analyze/medical-report/', medical_report_cors_fix.analyze_medical_report_cors_fix, name='analyze_medical_report'),
     path('analyze/medicines/', views.analyze_medicines, name='analyze_medicines'),
     path('analysis/<str:record_id>/', views.get_analysis, name='get_analysis'),
     path('analyses/', views.list_analyses, name='list_analyses'),

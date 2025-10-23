@@ -37,9 +37,26 @@ def analyze_health_record_cors_fix(request):
         
         # Use ULTRA-FAST INSTANT analysis to prevent worker timeouts
         print(f"⚡ Using ULTRA-FAST INSTANT analysis to prevent worker timeouts for: {file_name}")
+        print(f"🔍 DEBUG: record_type='{record_type}', file_name='{file_name}'")
         
-        # Determine document type based on filename
-        doc_type = "prescription" if any(word in file_name.lower() for word in ["prescription", "med", "rx", "image1"]) else "lab_report"
+        # Determine document type based on record_type and filename
+        record_type_lower = record_type.lower() if record_type else ""
+        file_name_lower = file_name.lower() if file_name else ""
+        
+        # Check record_type first, then filename
+        if "prescription" in record_type_lower or "med" in record_type_lower or "rx" in record_type_lower:
+            doc_type = "prescription"
+        elif "lab" in record_type_lower or "test" in record_type_lower or "result" in record_type_lower:
+            doc_type = "lab_report"
+        elif any(word in file_name_lower for word in ["prescription", "med", "rx", "image1", "image2", "image3", "image4"]):
+            doc_type = "prescription"
+        elif any(word in file_name_lower for word in ["lab", "test", "result", "sample", "image5", "image6", "image7"]):
+            doc_type = "lab_report"
+        else:
+            # Default based on record_type
+            doc_type = "prescription" if "prescription" in record_type_lower else "lab_report"
+        
+        print(f"🔍 DEBUG: Detected doc_type='{doc_type}'")
         
         if doc_type == "prescription":
             analysis_result = {
