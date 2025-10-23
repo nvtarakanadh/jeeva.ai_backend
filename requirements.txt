@@ -5,13 +5,3 @@ Pillow==11.3.0
 python-dotenv==1.1.1
 google-generativeai==0.8.5
 firecrawl-py==4.3.6
-gunicorn==21.2.0
-dj-database-url==2.1.0
-whitenoise==6.6.0
-psycopg[binary]==3.2.3
-
-# Medical Report Scanner Dependencies
-PyPDF2>=3.0.0
-pdfplumber>=0.9.0
-pandas>=2.0.0
-plotly>=5.15.0

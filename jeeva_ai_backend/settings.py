@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
-import dj_database_url
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -29,28 +28,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-7w0coe7@b-#(r*_3r45bgm&$h2ftt25_n@s8@#b2r-opc6b0(d')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-# BULLETPROOF ALLOWED_HOSTS configuration for production deployment
-# This ensures the backend works regardless of environment variable configuration
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'jeeva-ai-backend-5efz.onrender.com',
-    '*.onrender.com',  # Allow all Render subdomains
-    '*',  # Allow all hosts in production (temporary for debugging)
-]
-
-# BULLETPROOF: Ignore environment variable override for now
-# The environment variable has the wrong domain name
-# if os.getenv('ALLOWED_HOSTS'):
-#     ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
-
-# Debug logging for production troubleshooting
-print(f"🔧 ALLOWED_HOSTS configured as: {ALLOWED_HOSTS}")
-print(f"🔧 Environment ALLOWED_HOSTS: {os.getenv('ALLOWED_HOSTS', 'Not set')}")
-print(f"🔧 DEBUG mode: {DEBUG}")
-print(f"🔧 Using bulletproof configuration (ignoring env var)")
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -70,24 +50,12 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-]
-
-# CORS Configuration - MUST be at the top of middleware
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "https://jeeva-ai-frontend-gamma.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8081",
-    "http://127.0.0.1:8081"
 ]
 
 ROOT_URLCONF = 'jeeva_ai_backend.urls'
@@ -115,27 +83,10 @@ WSGI_APPLICATION = 'jeeva_ai_backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'jeeva_db'),
-        'USER': os.getenv('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'Tarakanadh'),
-        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
-        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
-# Production database configuration
-if os.environ.get('DATABASE_URL'):
-    DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
-    print("Using production database from DATABASE_URL")
-else:
-    # Fallback for development - only use local config if not in production
-    if os.environ.get('RENDER'):
-        print("ERROR: DATABASE_URL not found in production environment!")
-        print("Please ensure you have created a PostgreSQL database and set DATABASE_URL")
-        raise Exception("DATABASE_URL environment variable is required in production")
-    else:
-        print("Warning: DATABASE_URL not found, using local database configuration")
 
 
 # Password validation
@@ -173,10 +124,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# Static files storage for production
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -198,16 +145,17 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings - moved to top of file for proper middleware order
+# CORS settings
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081').split(',')
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
     'authorization',
-    'cache-control',
     'content-type',
     'dnt',
     'origin',
-    'pragma',
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
