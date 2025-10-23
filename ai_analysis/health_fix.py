@@ -31,7 +31,7 @@ def health_check_cors_fix(request):
     # Handle GET request
     health_data = {
         'status': 'healthy',
-        'message': 'Jeeva AI Backend is running with CORS fix',
+        'message': 'Jeeva AI Backend is running with CORS fix - Deployment refreshed',
         'timestamp': timezone.now().isoformat(),
         'version': '1.0.0',
         'cors': 'enabled'
