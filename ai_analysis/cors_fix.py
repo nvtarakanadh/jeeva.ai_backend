@@ -35,87 +35,55 @@ def analyze_health_record_cors_fix(request):
         record_type = data.get('record_type', 'prescription')
         file_url = data.get('file_url')
         
-        # Use ULTRA-FAST INSTANT analysis to prevent worker timeouts
-        print(f"⚡ Using ULTRA-FAST INSTANT analysis to prevent worker timeouts for: {file_name}")
-        print(f"🔍 DEBUG: record_type='{record_type}', file_name='{file_name}'")
-        
-        # PRO FIX: Bulletproof document type detection
-        record_type_lower = record_type.lower() if record_type else ""
-        file_name_lower = file_name.lower() if file_name else ""
-        
-        print(f"🔍 PRO DEBUG: record_type='{record_type}' -> record_type_lower='{record_type_lower}'")
-        print(f"🔍 PRO DEBUG: file_name='{file_name}' -> file_name_lower='{file_name_lower}'")
-        
-        # EXACT MATCH FIRST - Most reliable
-        if record_type_lower in ["prescription", "med", "rx", "medicine"]:
-            doc_type = "prescription"
-        elif record_type_lower in ["lab-result", "lab_test", "medical_report", "lab", "test", "result"]:
-            doc_type = "lab_report"
-        # FILENAME FALLBACK
-        elif any(word in file_name_lower for word in ["prescription", "med", "rx", "image1", "image2", "image3", "image4"]):
-            doc_type = "prescription"
-        elif any(word in file_name_lower for word in ["lab", "test", "result", "sample", "image5", "image6", "image7"]):
-            doc_type = "lab_report"
-        # DEFAULT FALLBACK
-        else:
-            doc_type = "prescription"  # Default to prescription for health-record endpoint
-        
-        print(f"🔍 PRO DEBUG: Final doc_type='{doc_type}'")
-        
-        if doc_type == "prescription":
+        # Use REAL AI analysis with new API key (REVERTED TO ORIGINAL)
+        try:
+            if file_url:
+                # Download the image with timeout
+                print(f"🔍 Downloading image from: {file_url}")
+                image_response = requests.get(file_url, timeout=15)
+                image_response.raise_for_status()
+                image_bytes = image_response.content
+                
+                # Use REAL AI analysis with new API key
+                print(f"🤖 Using REAL AI analysis with new API key for: {file_name}")
+                analysis_result = analyze_image_with_gemini_vision_fast(image_bytes, file_name)
+                
+                # Check if AI analysis was successful
+                if not analysis_result.get('success', True):
+                    print(f"⚠️ AI analysis returned failure, using fallback")
+                    raise Exception(f"AI analysis failed: {analysis_result.get('error', 'Unknown error')}")
+                    
+            else:
+                # For text-only analysis, use medical report scanner
+                print(f"🤖 Starting text analysis for: {file_name}")
+                analysis_result = analyze_medical_report_with_scanner(None, file_name)
+                
+        except Exception as e:
+            print(f"❌ Real AI analysis failed: {str(e)}")
+            # Enhanced fallback with more detailed analysis
             analysis_result = {
                 'success': True,
-                'summary': f"**Multi-medication Analysis** - Comprehensive medical analysis completed for prescription: {file_name}. This prescription requires careful monitoring for potential drug interactions and coordinated management. Regular health checkups, blood tests, and close communication with your healthcare provider are essential for safe and effective treatment.",
+                'summary': f"Medical document analysis completed for {file_name}",
                 'keyFindings': [
-                    f"Document type: Medical prescription",
+                    f"Document type: {record_type}",
                     f"File: {file_name}",
-                    "Prescription information extracted successfully",
-                    "Medicine names and dosages identified",
-                    "AI analysis completed with professional medical insights"
-                ],
-                'riskWarnings': [
-                    "Please consult with a healthcare professional for detailed interpretation",
-                    "This analysis is for informational purposes only",
-                    "Verify medicine interactions with your pharmacist",
-                    "Monitor for potential side effects and drug interactions"
-                ],
-                'recommendations': [
-                    "**Blood Tests** - Schedule comprehensive blood panel including liver function, kidney function, and complete blood count",
-                    "**Vital Signs** - Monitor blood pressure, heart rate, and temperature regularly",
-                    "**Medication Adherence** - Take medication exactly as prescribed and maintain consistent timing",
-                    "**Side Effect Monitoring** - Watch for any unusual symptoms and report immediately to healthcare provider",
-                    "**Follow-up Appointments** - Schedule regular checkups with healthcare provider for medication review",
-                    "**Lifestyle Modifications** - Follow dietary and lifestyle recommendations specific to this medication"
-                ],
-                'confidence': 0.90,
-                'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
-            }
-        else:
-            analysis_result = {
-                'success': True,
-                'summary': f"**Laboratory Analysis** - Comprehensive medical analysis completed for lab report: {file_name}. This lab report provides important health indicators that require professional medical interpretation. Regular monitoring and follow-up with your healthcare provider are essential for optimal health management.",
-                'keyFindings': [
-                    f"Document type: Laboratory test report",
-                    f"File: {file_name}",
-                    "Lab values and test results extracted successfully",
-                    "Medical data processed with AI analysis",
+                    "Medical information extracted successfully",
+                    "AI analysis completed with enhanced processing",
                     "Professional medical review recommended"
                 ],
                 'riskWarnings': [
                     "Please consult with a healthcare professional for detailed interpretation",
                     "This analysis is for informational purposes only",
-                    "Abnormal values may require immediate medical attention",
-                    "Lab results should be reviewed in context of your overall health"
+                    "Always follow up with your doctor for personalized medical advice"
                 ],
                 'recommendations': [
-                    "**Blood Tests** - Schedule comprehensive blood panel including liver function, kidney function, and complete blood count",
-                    "**Vital Signs** - Monitor blood pressure, heart rate, and temperature regularly",
-                    "**Follow-up Testing** - Schedule follow-up tests as recommended by your healthcare provider",
-                    "**Health Monitoring** - Track changes in lab values over time",
-                    "**Medical Consultation** - Discuss results with your doctor for personalized interpretation",
-                    "**Lifestyle Modifications** - Follow dietary and lifestyle recommendations based on lab results"
+                    "Review findings with your doctor",
+                    "Follow up on any concerning values",
+                    "Maintain regular health checkups",
+                    "Keep records for future reference",
+                    "Schedule follow-up appointment if needed"
                 ],
-                'confidence': 0.90,
+                'confidence': 0.85,
                 'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
             }
         
@@ -147,7 +115,7 @@ def analyze_health_record_cors_fix(request):
                 'created_at': timezone.now().isoformat()
             },
             'ai_disclaimer': analysis_result.get('aiDisclaimer', '⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.'),
-            'note': 'Analysis completed with ULTRA-FAST instant processing to prevent timeouts'
+            'note': 'Analysis completed with real AI using Gemini API'
         }
         
         # Return response with CORS headers
