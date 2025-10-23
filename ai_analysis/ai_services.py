@@ -428,7 +428,7 @@ def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
         
         # Configure Gemini
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')  # Use faster model
+        model = genai.GenerativeModel('gemini-2.5-flash')  # Use available model
         
         # Convert file data to PIL Image
         if isinstance(file_data, bytes):
@@ -529,7 +529,7 @@ def analyze_image_with_gemini_vision(file_data, file_name: str) -> Dict:
     """Analyze medical image directly using Gemini Vision API"""
     try:
         # Configure Gemini
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Prepare the image
         if hasattr(file_data, 'read'):
