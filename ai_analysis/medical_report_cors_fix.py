@@ -9,7 +9,7 @@ from django.utils import timezone
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
 def analyze_medical_report_cors_fix(request):
-    """CORS-fixed medical report analysis endpoint"""
+    """CORS-fixed medical report analysis endpoint - handles both FormData and JSON"""
     
     # Handle OPTIONS preflight request
     if request.method == 'OPTIONS':
@@ -20,8 +20,24 @@ def analyze_medical_report_cors_fix(request):
         return response
     
     try:
-        # Parse JSON data
-        data = json.loads(request.body) if request.body else {}
+        # Handle both FormData and JSON data
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # Handle FormData (from frontend file upload)
+            data = {
+                'record_id': request.POST.get('record_id', str(uuid.uuid4())),
+                'file_name': request.POST.get('title', 'medical_document'),
+                'record_type': 'lab-result',  # Default for medical reports
+                'file_url': request.POST.get('file_url', ''),
+                'title': request.POST.get('title', 'Medical Report'),
+                'description': request.POST.get('description', ''),
+                'service_date': request.POST.get('service_date', timezone.now().isoformat()),
+                'patient_id': request.POST.get('patient_id', 'unknown')
+            }
+            print(f"🔍 FormData received: {data}")
+        else:
+            # Handle JSON data
+            data = json.loads(request.body) if request.body else {}
+            print(f"🔍 JSON data received: {data}")
         
         # Get request data
         record_id = data.get('record_id', str(uuid.uuid4()))
