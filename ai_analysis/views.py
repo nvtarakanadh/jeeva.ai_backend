@@ -77,31 +77,19 @@ def analyze_prescription(request):
         
         # Create or get health record
         record_id = str(uuid.uuid4())
-        # DATABASE-FREE: Skip database creation
-        # health_record = HealthRecord.objects.create(
-            id=record_id,
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_type='prescription',
-            title=serializer.validated_data.get('title', 'Prescription Analysis'),
-            description=serializer.validated_data.get('description', ''),
-            file_name=image.name,
-            service_date=timezone.now().date()
-        )
         
-        # Create AI analysis
-        # DATABASE-FREE: Skip database creation
-        # ai_analysis = AIAnalysis.objects.create(
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            key_findings=json.dumps(analysis_result['keyFindings']),
-            risk_warnings=json.dumps(analysis_result['riskWarnings']),
-            recommendations=json.dumps(analysis_result['recommendations']),
-            confidence_score=int(analysis_result['confidence'] * 100)
-        )
-        
-        # Return the analysis result
-        analysis_data = AIAnalysisSerializer(ai_analysis).data
+        # Create AI analysis data (database-free)
+        analysis_data = {
+            'id': str(uuid.uuid4()),
+            'user_id': serializer.validated_data.get('patient_id', 'unknown'),
+            'record_id': record_id,
+            'summary': analysis_result['summary'],
+            'key_findings': analysis_result['keyFindings'],
+            'risk_warnings': analysis_result['riskWarnings'],
+            'recommendations': analysis_result['recommendations'],
+            'confidence_score': int(analysis_result['confidence'] * 100),
+            'created_at': timezone.now().isoformat()
+        }
         analysis_data['ai_disclaimer'] = analysis_result.get('aiDisclaimer', '')
         
         return Response({
@@ -184,20 +172,18 @@ def analyze_health_record(request):
             'created_at': timezone.now().isoformat()
         }
         
-        # Create AI analysis
-        # DATABASE-FREE: Skip database creation
-        # ai_analysis = AIAnalysis.objects.create(
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            key_findings=json.dumps(analysis_result['keyFindings']),
-            risk_warnings=json.dumps(analysis_result['riskWarnings']),
-            recommendations=json.dumps(analysis_result['recommendations']),
-            confidence_score=int(analysis_result['confidence'] * 100)
-        )
-        
-        # Return the analysis result
-        analysis_data = AIAnalysisSerializer(ai_analysis).data
+        # Create AI analysis data (database-free)
+        analysis_data = {
+            'id': str(uuid.uuid4()),
+            'user_id': serializer.validated_data.get('patient_id', 'unknown'),
+            'record_id': record_id,
+            'summary': analysis_result['summary'],
+            'key_findings': analysis_result['keyFindings'],
+            'risk_warnings': analysis_result['riskWarnings'],
+            'recommendations': analysis_result['recommendations'],
+            'confidence_score': int(analysis_result['confidence'] * 100),
+            'created_at': timezone.now().isoformat()
+        }
         analysis_data['ai_disclaimer'] = analysis_result.get('aiDisclaimer', '')
         
         return Response({
@@ -291,35 +277,36 @@ def analyze_medicines(request):
         # Use the record ID from the frontend if provided, otherwise create a new one
         record_id = serializer.validated_data.get('record_id', str(uuid.uuid4()))
         
-        # Create health record
-        # DATABASE-FREE: Skip database creation
-        # health_record = HealthRecord.objects.create(
-            id=record_id,
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_type='prescription',
-            title=serializer.validated_data.get('title', 'Medicine Analysis'),
-            description=serializer.validated_data.get('description', f"Analysis of medicines: {', '.join(medicine_names)}"),
-            service_date=timezone.now().date()
-        )
+        # Create health record data (database-free)
+        health_record_data = {
+            'id': record_id,
+            'user_id': serializer.validated_data.get('patient_id', 'unknown'),
+            'record_type': 'prescription',
+            'title': serializer.validated_data.get('title', 'Medicine Analysis'),
+            'description': serializer.validated_data.get('description', f"Analysis of medicines: {', '.join(medicine_names)}"),
+            'service_date': timezone.now().date().isoformat(),
+            'created_at': timezone.now().isoformat()
+        }
         
-        # Create AI analysis with new fields
-        # DATABASE-FREE: Skip database creation
-        # ai_analysis = AIAnalysis.objects.create(
-            user_id=serializer.validated_data.get('patient_id', 'unknown'),
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            key_findings=json.dumps(analysis_result['keyFindings']),
-            risk_warnings=json.dumps(analysis_result['riskWarnings']),
-            recommendations=json.dumps(analysis_result['recommendations']),
-            confidence_score=int(analysis_result['confidence'] * 100)
-        )
+        # Create AI analysis data (database-free)
+        analysis_data = {
+            'id': str(uuid.uuid4()),
+            'user_id': serializer.validated_data.get('patient_id', 'unknown'),
+            'record_id': record_id,
+            'summary': analysis_result['summary'],
+            'key_findings': analysis_result['keyFindings'],
+            'risk_warnings': analysis_result['riskWarnings'],
+            'recommendations': analysis_result['recommendations'],
+            'confidence_score': int(analysis_result['confidence'] * 100),
+            'created_at': timezone.now().isoformat()
+        }
         
         # Return the analysis result
         return Response({
             'success': True,
             'record_id': record_id,
-            'analysis': AIAnalysisSerializer(ai_analysis).data,
-            'health_record': HealthRecordSerializer(health_record).data,
+            'analysis': analysis_data,
+            'health_record': health_record_data,
             'medicine_names': medicine_names
         }, status=status.HTTP_200_OK)
         
@@ -378,31 +365,31 @@ def analyze_medical_report(request):
         
         # Create or get health record
         record_id = str(uuid.uuid4())
-        # DATABASE-FREE: Skip database creation
-        # health_record = HealthRecord.objects.create(
-            id=record_id,
-            user_id=patient_id,
-            record_type='lab_test',
-            title=title,
-            description=description,
-            file_name=uploaded_file.name,
-            service_date=timezone.now().date()
-        )
         
-        # Create AI analysis
-        # DATABASE-FREE: Skip database creation
-        # ai_analysis = AIAnalysis.objects.create(
-            user_id=patient_id,
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            key_findings=json.dumps(analysis_result['keyFindings']),
-            risk_warnings=json.dumps(analysis_result['riskWarnings']),
-            recommendations=json.dumps(analysis_result['recommendations']),
-            confidence_score=int(analysis_result['confidence'] * 100)
-        )
+        # Create health record data (database-free)
+        health_record_data = {
+            'id': record_id,
+            'user_id': patient_id,
+            'record_type': 'lab_test',
+            'title': title,
+            'description': description,
+            'file_name': uploaded_file.name,
+            'service_date': timezone.now().date().isoformat(),
+            'created_at': timezone.now().isoformat()
+        }
         
-        # Return the analysis result
-        analysis_data = AIAnalysisSerializer(ai_analysis).data
+        # Create AI analysis data (database-free)
+        analysis_data = {
+            'id': str(uuid.uuid4()),
+            'user_id': patient_id,
+            'record_id': record_id,
+            'summary': analysis_result['summary'],
+            'key_findings': analysis_result['keyFindings'],
+            'risk_warnings': analysis_result['riskWarnings'],
+            'recommendations': analysis_result['recommendations'],
+            'confidence_score': int(analysis_result['confidence'] * 100),
+            'created_at': timezone.now().isoformat()
+        }
         analysis_data['ai_disclaimer'] = analysis_result.get('aiDisclaimer', '')
         
         return Response({
