@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import datetime
 import uuid
 import requests
+import json
 
 from .models import HealthRecord, AIAnalysis
 from .serializers import (
@@ -45,31 +46,23 @@ def analyze_prescription(request):
         record_id = str(uuid.uuid4())
         health_record = HealthRecord.objects.create(
             id=record_id,
-            patient_id=serializer.validated_data.get('patient_id', 'unknown'),
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_type='prescription',
             title=serializer.validated_data.get('title', 'Prescription Analysis'),
             description=serializer.validated_data.get('description', ''),
             file_name=image.name,
-            file_type=image.content_type,
-            record_date=timezone.now(),
-            uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
+            service_date=timezone.now().date()
         )
         
         # Create AI analysis
         ai_analysis = AIAnalysis.objects.create(
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            predictive_insights=analysis_result.get('predictiveInsights', []),
-            detailed_report=analysis_result.get('detailedReport', ''),
-            medicine_names=analysis_result.get('medicineNames', []),
-            disclaimer=analysis_result.get('disclaimer', ''),
-            ai_disclaimer=analysis_result.get('aiDisclaimer', ''),
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
-            record_title=health_record.title
+            key_findings=json.dumps(analysis_result['keyFindings']),
+            risk_warnings=json.dumps(analysis_result['riskWarnings']),
+            recommendations=json.dumps(analysis_result['recommendations']),
+            confidence_score=int(analysis_result['confidence'] * 100)
         )
         
         # Return the analysis result
@@ -102,15 +95,20 @@ def analyze_health_record(request):
         
         # Check if this is an image upload (has file_url)
         if serializer.validated_data.get('file_url') and not serializer.validated_data.get('description'):
-            # This is an image upload, use image analysis
+            # This is an image upload, use medical report analysis
             try:
                 # Download the image from the URL
                 image_response = requests.get(serializer.validated_data['file_url'])
                 image_response.raise_for_status()
                 image_bytes = image_response.content
                 
-                # Analyze prescription using Gemini AI (original model)
-                analysis_result = analyze_prescription_with_gemini(image_bytes)
+                # Create a file-like object for the medical report scanner
+                from io import BytesIO
+                file_obj = BytesIO(image_bytes)
+                file_obj.name = serializer.validated_data.get('file_name', 'medical_report.jpg')
+                
+                # Analyze using medical report scanner
+                analysis_result = analyze_medical_report_with_scanner(file_obj, file_obj.name)
             except Exception as e:
                 return Response(
                     {'error': f'Failed to download or analyze image: {str(e)}'}, 
@@ -134,30 +132,24 @@ def analyze_health_record(request):
         
         health_record = HealthRecord.objects.create(
             id=record_id,
-            patient_id=serializer.validated_data.get('patient_id', 'unknown'),
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_type=serializer.validated_data['record_type'],
             title=serializer.validated_data['title'],
             description=serializer.validated_data.get('description', ''),
             file_url=serializer.validated_data.get('file_url'),
             file_name=serializer.validated_data.get('file_name'),
-            file_type=serializer.validated_data.get('file_name', '').split('.')[-1] if serializer.validated_data.get('file_name') else None,
-            record_date=record_date,
-            uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
+            service_date=record_date.date()
         )
         
         # Create AI analysis
         ai_analysis = AIAnalysis.objects.create(
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            predictive_insights=analysis_result.get('predictiveInsights', []),
-            detailed_report=analysis_result.get('detailedReport', ''),
-            medicine_names=analysis_result.get('medicineNames', []),
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
-            record_title=health_record.title
+            key_findings=json.dumps(analysis_result['keyFindings']),
+            risk_warnings=json.dumps(analysis_result['riskWarnings']),
+            recommendations=json.dumps(analysis_result['recommendations']),
+            confidence_score=int(analysis_result['confidence'] * 100)
         )
         
         # Return the analysis result
@@ -216,7 +208,7 @@ def get_analysis(request, record_id):
 def list_analyses(request):
     """List all AI analyses"""
     try:
-        analyses = AIAnalysis.objects.all().order_by('-processed_at')
+        analyses = AIAnalysis.objects.all().order_by('-created_at')
         serializer = AIAnalysisSerializer(analyses, many=True)
         
         return Response({
@@ -258,27 +250,22 @@ def analyze_medicines(request):
         # Create health record
         health_record = HealthRecord.objects.create(
             id=record_id,
-            patient_id=serializer.validated_data.get('patient_id', 'unknown'),
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_type='prescription',
             title=serializer.validated_data.get('title', 'Medicine Analysis'),
             description=serializer.validated_data.get('description', f"Analysis of medicines: {', '.join(medicine_names)}"),
-            record_date=timezone.now(),
-            uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
+            service_date=timezone.now().date()
         )
         
         # Create AI analysis with new fields
         ai_analysis = AIAnalysis.objects.create(
+            user_id=serializer.validated_data.get('patient_id', 'unknown'),
             record_id=record_id,
             summary=analysis_result['summary'],
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            predictive_insights=analysis_result.get('predictiveInsights', []),
-            detailed_report=analysis_result.get('detailedReport', ''),
-            medicine_names=analysis_result.get('medicineNames', medicine_names),
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
-            record_title=health_record.title
+            key_findings=json.dumps(analysis_result['keyFindings']),
+            risk_warnings=json.dumps(analysis_result['riskWarnings']),
+            recommendations=json.dumps(analysis_result['recommendations']),
+            confidence_score=int(analysis_result['confidence'] * 100)
         )
         
         # Return the analysis result
@@ -337,31 +324,23 @@ def analyze_medical_report(request):
         record_id = str(uuid.uuid4())
         health_record = HealthRecord.objects.create(
             id=record_id,
-            patient_id=patient_id,
+            user_id=patient_id,
             record_type='lab_test',
             title=title,
             description=description,
             file_name=uploaded_file.name,
-            file_type=uploaded_file.content_type,
-            record_date=timezone.now(),
-            uploaded_by=uploaded_by
+            service_date=timezone.now().date()
         )
         
         # Create AI analysis
         ai_analysis = AIAnalysis.objects.create(
+            user_id=patient_id,
             record_id=record_id,
             summary=analysis_result['summary'],
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            predictive_insights=analysis_result.get('predictiveInsights', []),
-            detailed_report=analysis_result.get('detailedReport', ''),
-            medicine_names=analysis_result.get('medicineNames', []),
-            disclaimer=analysis_result.get('disclaimer', ''),
-            ai_disclaimer=analysis_result.get('aiDisclaimer', ''),
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
-            record_title=health_record.title
+            key_findings=json.dumps(analysis_result['keyFindings']),
+            risk_warnings=json.dumps(analysis_result['riskWarnings']),
+            recommendations=json.dumps(analysis_result['recommendations']),
+            confidence_score=int(analysis_result['confidence'] * 100)
         )
         
         # Return the analysis result

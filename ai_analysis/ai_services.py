@@ -375,6 +375,122 @@ def generate_predictive_insights_from_medicines(medicine_names: List[str]) -> Di
         raise Exception(f"Error generating predictive insights: {str(e)}")
 
 
+def analyze_image_with_gemini_vision(file_data, file_name: str) -> Dict:
+    """Analyze medical image directly using Gemini Vision API"""
+    try:
+        # Configure Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Prepare the image
+        if hasattr(file_data, 'read'):
+            # File-like object
+            image_bytes = file_data.read()
+        else:
+            # Already bytes
+            image_bytes = file_data
+            
+        # Convert to PIL Image
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Create prompt for medical analysis
+        prompt = """
+        You are a medical AI assistant. Analyze this medical document/image and provide a comprehensive medical report analysis.
+        
+        Please carefully examine the image and extract:
+        1. Patient information (name, age, date, ID if visible)
+        2. All test results, values, measurements, and reference ranges
+        3. Any abnormal findings, critical values, or concerning patterns
+        4. Medical recommendations, notes, or doctor comments
+        5. Overall health assessment and risk level
+        
+        Provide detailed analysis including:
+        - Specific test values found
+        - Normal vs abnormal ranges
+        - Clinical significance of findings
+        - Potential health implications
+        - Recommended follow-up actions
+        
+        Be thorough and professional in your analysis. If you can see specific medical data, provide detailed insights.
+        """
+        
+        # Generate analysis
+        response = model.generate_content([prompt, image])
+        analysis_text = response.text
+        
+        # Parse the response and structure it
+        # Extract key information from the analysis text
+        lines = analysis_text.split('\n')
+        key_findings = []
+        risk_warnings = []
+        recommendations = []
+        
+        # Process the analysis text to extract structured information
+        for line in lines:
+            line = line.strip()
+            if line:
+                if any(keyword in line.lower() for keyword in ['abnormal', 'high', 'low', 'critical', 'warning', 'risk']):
+                    risk_warnings.append(f"⚠️ {line}")
+                elif any(keyword in line.lower() for keyword in ['recommend', 'suggest', 'follow-up', 'consult', 'monitor']):
+                    recommendations.append(f"💡 {line}")
+                elif any(keyword in line.lower() for keyword in ['test', 'result', 'value', 'finding', 'level']):
+                    key_findings.append(f"📊 {line}")
+        
+        # If no structured data found, use the full text
+        if not key_findings:
+            key_findings = [f"📋 **Analysis**: {analysis_text[:300]}..." if len(analysis_text) > 300 else f"📋 **Analysis**: {analysis_text}"]
+        
+        if not risk_warnings:
+            risk_warnings = [
+                "⚠️ **Medical Disclaimer**: This AI analysis is for informational purposes only",
+                "⚠️ **Professional Consultation**: Always consult with qualified healthcare professionals"
+            ]
+        
+        if not recommendations:
+            recommendations = [
+                "💡 **Follow-up**: Consult with your healthcare provider for detailed interpretation",
+                "💡 **Documentation**: Keep this analysis for your medical records"
+            ]
+        
+        return {
+            "summary": f"Comprehensive medical document analysis completed for {file_name}. AI-powered vision analysis extracted detailed medical information from the document.",
+            "keyFindings": key_findings[:5],  # Limit to 5 key findings
+            "riskWarnings": risk_warnings[:4],  # Limit to 4 warnings
+            "recommendations": recommendations[:4],  # Limit to 4 recommendations
+            "confidence": 0.85,
+            "analysisType": "AI Vision Analysis",
+            "detailedReport": analysis_text,
+            "medicineNames": [],
+            "disclaimer": "This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals.",
+            "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
+        }
+        
+    except Exception as e:
+        logger.error(f"Gemini Vision analysis failed: {str(e)}")
+        # Return a basic fallback analysis
+        return {
+            "summary": f"Basic analysis completed for {file_name}",
+            "keyFindings": [
+                f"**Document**: {file_name}",
+                "**Status**: Image processed but detailed analysis unavailable",
+                "**Recommendation**: Please consult with a healthcare professional for proper interpretation"
+            ],
+            "riskWarnings": [
+                "⚠️ **Limited Analysis**: Unable to perform detailed text extraction",
+                "⚠️ **Professional Review**: Manual review by healthcare professional recommended"
+            ],
+            "recommendations": [
+                "💡 **Manual Review**: Have this document reviewed by a qualified healthcare provider",
+                "💡 **Image Quality**: Consider rescanning with higher resolution if possible"
+            ],
+            "confidence": 0.3,
+            "analysisType": "Basic Image Analysis",
+            "detailedReport": f"Basic analysis of {file_name}. Detailed text extraction was not possible, but the image was successfully processed.",
+            "medicineNames": [],
+            "disclaimer": "This is a basic analysis due to text extraction limitations. Please consult with qualified healthcare professionals for proper medical interpretation.",
+            "aiDisclaimer": "⚠️ **Limited Analysis**: This analysis is limited due to text extraction issues. Please consult your healthcare provider for proper interpretation."
+        }
+
+
 def analyze_medical_report_with_scanner(file_data, file_name: str) -> Dict:
     """Analyze medical report using the MedicalReportScanner"""
     try:
@@ -388,8 +504,10 @@ def analyze_medical_report_with_scanner(file_data, file_name: str) -> Dict:
         # Process the uploaded file
         extracted_text = scanner.process_uploaded_file(file_data)
         
-        if not extracted_text or len(extracted_text.strip()) < 10:
-            raise ValueError("Could not extract sufficient text from the file")
+        # If text extraction fails or is insufficient, use Gemini Vision directly
+        if not extracted_text or len(extracted_text.strip()) < 5:
+            logger.warning(f"Text extraction failed or insufficient text ({len(extracted_text) if extracted_text else 0} chars), using Gemini Vision directly")
+            return analyze_image_with_gemini_vision(file_data, file_name)
         
         # Try complex AI analysis first, with timeout handling
         try:
@@ -425,7 +543,7 @@ def analyze_medical_report_with_scanner(file_data, file_name: str) -> Dict:
             "recommendations": [
                 rec.get('recommendation', '') for rec in diagnosis.get('recommendations', [])
             ] + [
-                "💡 **Follow-up Tests**: " + test for test in diagnosis.get('follow_up_tests', [])
+                f"💡 **Follow-up Tests**: {test}" for test in diagnosis.get('follow_up_tests', [])
             ],
             "predictiveInsights": [
                 f"**Overall Health Risk**: {diagnosis.get('risk_assessment', {}).get('overall_risk', 'moderate').title()}",

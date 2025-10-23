@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import json
 from .models import HealthRecord, AIAnalysis
 
 
@@ -9,9 +10,31 @@ class HealthRecordSerializer(serializers.ModelSerializer):
 
 
 class AIAnalysisSerializer(serializers.ModelSerializer):
+    key_findings = serializers.SerializerMethodField()
+    risk_warnings = serializers.SerializerMethodField()
+    recommendations = serializers.SerializerMethodField()
+    
     class Meta:
         model = AIAnalysis
         fields = '__all__'
+    
+    def get_key_findings(self, obj):
+        try:
+            return json.loads(obj.key_findings) if obj.key_findings else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    
+    def get_risk_warnings(self, obj):
+        try:
+            return json.loads(obj.risk_warnings) if obj.risk_warnings else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    
+    def get_recommendations(self, obj):
+        try:
+            return json.loads(obj.recommendations) if obj.recommendations else []
+        except (json.JSONDecodeError, TypeError):
+            return []
 
 
 class PrescriptionAnalysisRequestSerializer(serializers.Serializer):

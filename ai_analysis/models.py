@@ -3,6 +3,8 @@ from django.utils import timezone
 import uuid
 
 
+
+
 class Profile(models.Model):
     """User profiles with roles (patient/doctor)"""
     ROLE_CHOICES = [
@@ -57,7 +59,6 @@ class HealthRecord(models.Model):
     file_name = models.TextField(blank=True, null=True)
     service_date = models.DateField(default=timezone.now)
     provider_name = models.TextField(blank=True, null=True)
-    tags = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -75,9 +76,9 @@ class AIAnalysis(models.Model):
     user_id = models.UUIDField(default=uuid.uuid4)
     record_id = models.UUIDField(default=uuid.uuid4)
     summary = models.TextField()
-    key_findings = models.JSONField(default=list)
-    risk_warnings = models.JSONField(default=list, blank=True)
-    recommendations = models.JSONField(default=list)
+    key_findings = models.TextField(default='[]')
+    risk_warnings = models.TextField(default='[]', blank=True)
+    recommendations = models.TextField(default='[]')
     confidence_score = models.IntegerField(default=0)
     created_at = models.DateTimeField(default=timezone.now)
     
