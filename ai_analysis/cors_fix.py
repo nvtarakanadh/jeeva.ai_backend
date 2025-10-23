@@ -9,7 +9,7 @@ import json
 import uuid
 import requests
 from django.utils import timezone
-from .ai_services import analyze_image_with_gemini_vision_fast, analyze_medical_report_with_scanner
+from .ai_services import analyze_prescription_with_gemini, analyze_medical_report_with_scanner
 
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
@@ -44,9 +44,9 @@ def analyze_health_record_cors_fix(request):
                 image_response.raise_for_status()
                 image_bytes = image_response.content
                 
-                # Use REAL AI analysis with new API key
+                # Use REAL AI analysis with new API key (original working method)
                 print(f"🤖 Using REAL AI analysis with new API key for: {file_name}")
-                analysis_result = analyze_image_with_gemini_vision_fast(image_bytes, file_name)
+                analysis_result = analyze_prescription_with_gemini(image_bytes)
                 
                 # Check if AI analysis was successful
                 if not analysis_result.get('success', True):
