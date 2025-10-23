@@ -28,6 +28,33 @@ def cors_response(data, status_code=200):
     return response
 
 
+@api_view(['GET', 'HEAD', 'OPTIONS'])
+def root_endpoint(request):
+    """Root endpoint for API information"""
+    
+    # Handle OPTIONS preflight request
+    if request.method == 'OPTIONS':
+        return cors_response({}, status.HTTP_200_OK)
+    
+    # Handle HEAD request
+    if request.method == 'HEAD':
+        return cors_response({}, status.HTTP_200_OK)
+    
+    # Handle GET request
+    return cors_response({
+        'message': 'Jeeva AI Backend API',
+        'version': '1.0.0',
+        'status': 'running',
+        'endpoints': {
+            'health': '/api/ai/health/',
+            'analyze_prescription': '/api/ai/analyze/prescription/',
+            'analyze_health_record': '/api/ai/analyze/health-record/',
+            'analyze_medical_report': '/api/ai/analyze/medical-report/',
+        },
+        'timestamp': timezone.now().isoformat()
+    }, status.HTTP_200_OK)
+
+
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def analyze_prescription(request):
