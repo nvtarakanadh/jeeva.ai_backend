@@ -436,20 +436,25 @@ def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
         else:
             image = file_data
         
-        # Enhanced prompt for better medical analysis
+        # Optimized prompt for faster processing
         prompt = """
-        Analyze this medical document image and provide a comprehensive medical analysis. Please identify:
+        Analyze this medical document quickly. Provide:
+        1. Document type (prescription/lab report/etc.)
+        2. Key medical findings
+        3. Any critical values
+        4. Basic recommendations
         
-        1. Document Type: What type of medical document is this? (prescription, lab report, X-ray, etc.)
-        2. Key Medical Information: Extract important medical data, values, medications, or findings
-        3. Critical Findings: Any abnormal values, concerning results, or important medical information
-        4. Recommendations: What should the patient do based on this document?
-        
-        Provide a detailed but concise analysis suitable for a medical professional to review.
+        Keep response concise and structured.
         """
         
-        # Generate analysis with timeout
+        # Generate analysis with timeout and memory optimization
         print(f"🤖 Sending request to Gemini API for {file_name}")
+        
+        # Optimize image size for faster processing
+        if hasattr(image, 'size') and image.size[0] > 1024:
+            image = image.resize((1024, int(1024 * image.size[1] / image.size[0])))
+            print(f"📏 Resized image for faster processing")
+        
         response = model.generate_content([prompt, image])
         
         if not response or not response.text:
@@ -457,6 +462,9 @@ def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
             
         analysis_text = response.text
         print(f"✅ Received analysis from Gemini: {len(analysis_text)} characters")
+        
+        # Clear image from memory
+        del image
         
         # Parse the response into structured format
         lines = analysis_text.split('\n')
