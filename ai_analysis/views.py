@@ -17,7 +17,7 @@ from .serializers import (
     HealthRecordAnalysisRequestSerializer,
     MedicineAnalysisRequestSerializer
 )
-from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner
+from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner, analyze_image_with_gemini_vision_fast
 
 # Custom response function with CORS headers
 def cors_response(data, status_code=200):
