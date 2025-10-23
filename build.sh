@@ -10,19 +10,27 @@ pip install -r requirements.txt
 # Set Django settings module
 export DJANGO_SETTINGS_MODULE=jeeva_ai_backend.settings
 
-# Run database migrations if DATABASE_URL is available
-if [ ! -z "$DATABASE_URL" ]; then
-    echo "🔄 Running database migrations..."
-    python manage.py migrate --noinput
-    if [ $? -eq 0 ]; then
-        echo "✅ Database migrations completed successfully!"
-    else
-        echo "❌ Database migrations failed!"
-        exit 1
-    fi
+# Debug: Show environment variables
+echo "🔍 Environment check:"
+echo "DATABASE_URL: ${DATABASE_URL:0:50}..."
+echo "DEBUG: $DEBUG"
+echo "ALLOWED_HOSTS: $ALLOWED_HOSTS"
+
+# Always run migrations (even if DATABASE_URL is not set initially)
+echo "🔄 Running database migrations..."
+python manage.py migrate --noinput
+if [ $? -eq 0 ]; then
+    echo "✅ Database migrations completed successfully!"
 else
-    echo "⚠️ DATABASE_URL not found, skipping migrations..."
+    echo "❌ Database migrations failed!"
+    echo "🔍 Trying to show migration status..."
+    python manage.py showmigrations
+    exit 1
 fi
+
+# Show migration status for debugging
+echo "🔍 Migration status:"
+python manage.py showmigrations
 
 # Collect static files
 echo "📁 Collecting static files..."
