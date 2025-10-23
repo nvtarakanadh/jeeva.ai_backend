@@ -10,7 +10,7 @@ services:
       - key: DEBUG
         value: False
       - key: ALLOWED_HOSTS
-        value: jeeva-ai-backend-5efz.onrender.com
+        value: localhost,127.0.0.1,jeeva-ai-backend-5efz.onrender.com
       - key: GEMINI_API_KEY
         value: AIzaSyD8MiivYlzS9_fZ9SE_et_iimBih5u33sg
       - key: FIRECRAWL_API_KEY
