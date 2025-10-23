@@ -27,9 +27,18 @@ def cors_response(data, status_code=200):
     response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 def root_endpoint(request):
-    """Root endpoint for the API"""
+    """Root endpoint for the API - supports both GET and HEAD methods"""
+    if request.method == 'HEAD':
+        # For HEAD requests, return empty response with just headers
+        response = Response(status=200)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
+    
+    # For GET requests, return full API information
     return cors_response({
         'message': 'Jeeva AI Backend API is running!',
         'status': 'healthy',
@@ -320,15 +329,24 @@ def analyze_medicines(request):
         )
 
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 def health_check(request):
-    """Health check endpoint"""
-    return Response({
+    """Health check endpoint - supports both GET and HEAD methods"""
+    if request.method == 'HEAD':
+        # For HEAD requests, return empty response with just headers
+        response = Response(status=200)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
+    
+    # For GET requests, return full health information
+    return cors_response({
         'status': 'healthy',
         'message': 'Jeeva AI Backend is running',
         'timestamp': timezone.now().isoformat(),
         'version': '1.0.0'
-    }, status=status.HTTP_200_OK)
+    })
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
