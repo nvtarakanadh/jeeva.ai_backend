@@ -39,24 +39,28 @@ def analyze_health_record_cors_fix(request):
         print(f"⚡ Using ULTRA-FAST INSTANT analysis to prevent worker timeouts for: {file_name}")
         print(f"🔍 DEBUG: record_type='{record_type}', file_name='{file_name}'")
         
-        # Determine document type based on record_type and filename
+        # PRO FIX: Bulletproof document type detection
         record_type_lower = record_type.lower() if record_type else ""
         file_name_lower = file_name.lower() if file_name else ""
         
-        # Check record_type first, then filename
-        if "prescription" in record_type_lower or "med" in record_type_lower or "rx" in record_type_lower:
+        print(f"🔍 PRO DEBUG: record_type='{record_type}' -> record_type_lower='{record_type_lower}'")
+        print(f"🔍 PRO DEBUG: file_name='{file_name}' -> file_name_lower='{file_name_lower}'")
+        
+        # EXACT MATCH FIRST - Most reliable
+        if record_type_lower in ["prescription", "med", "rx", "medicine"]:
             doc_type = "prescription"
-        elif "lab" in record_type_lower or "test" in record_type_lower or "result" in record_type_lower:
+        elif record_type_lower in ["lab-result", "lab_test", "medical_report", "lab", "test", "result"]:
             doc_type = "lab_report"
+        # FILENAME FALLBACK
         elif any(word in file_name_lower for word in ["prescription", "med", "rx", "image1", "image2", "image3", "image4"]):
             doc_type = "prescription"
         elif any(word in file_name_lower for word in ["lab", "test", "result", "sample", "image5", "image6", "image7"]):
             doc_type = "lab_report"
+        # DEFAULT FALLBACK
         else:
-            # Default based on record_type
-            doc_type = "prescription" if "prescription" in record_type_lower else "lab_report"
+            doc_type = "prescription"  # Default to prescription for health-record endpoint
         
-        print(f"🔍 DEBUG: Detected doc_type='{doc_type}'")
+        print(f"🔍 PRO DEBUG: Final doc_type='{doc_type}'")
         
         if doc_type == "prescription":
             analysis_result = {

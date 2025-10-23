@@ -47,6 +47,11 @@ def analyze_medical_report_cors_fix(request):
         
         print(f"🔍 Medical Report CORS Fix: record_type='{record_type}', file_name='{file_name}'")
         
+        # PRO FIX: Medical report endpoint should ALWAYS return lab report analysis
+        # This endpoint is specifically for lab reports, so force lab_report type
+        doc_type = "lab_report"
+        print(f"🔍 PRO DEBUG: Medical report endpoint - FORCED doc_type='{doc_type}'")
+        
         # Use ULTRA-FAST INSTANT analysis for lab reports
         analysis_result = {
             'success': True,
