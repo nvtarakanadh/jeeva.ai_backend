@@ -27,6 +27,21 @@ def cors_response(data, status_code=200):
     response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
+@api_view(['GET'])
+def root_endpoint(request):
+    """Root endpoint for the API"""
+    return cors_response({
+        'message': 'Jeeva AI Backend API is running!',
+        'status': 'healthy',
+        'version': '1.0.0',
+        'endpoints': {
+            'health_check': '/api/ai/health/',
+            'analyze_health_record': '/api/ai/analyze/health-record/',
+            'analyze_prescription': '/api/ai/analyze/prescription/',
+            'list_analyses': '/api/ai/analyses/'
+        }
+    })
+
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
