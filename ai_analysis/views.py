@@ -96,7 +96,7 @@ def analyze_prescription(request):
             'success': True,
             'record_id': record_id,
             'analysis': analysis_data,
-            'health_record': HealthRecordSerializer(health_record).data,
+            'health_record': health_record_data,
             'ai_disclaimer': analysis_result.get('aiDisclaimer', '⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.')
         }, status=status.HTTP_200_OK)
         
@@ -190,7 +190,7 @@ def analyze_health_record(request):
             'success': True,
             'record_id': record_id,
             'analysis': analysis_data,
-            'health_record': HealthRecordSerializer(health_record).data,
+            'health_record': health_record_data,
             'ai_disclaimer': analysis_result.get('aiDisclaimer', '⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.')
         }, status=status.HTTP_200_OK)
         
@@ -396,7 +396,7 @@ def analyze_medical_report(request):
             'success': True,
             'record_id': record_id,
             'analysis': analysis_data,
-            'health_record': HealthRecordSerializer(health_record).data,
+            'health_record': health_record_data,
             'ai_disclaimer': analysis_result.get('aiDisclaimer', '⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.')
         }, status=status.HTTP_200_OK)
         
