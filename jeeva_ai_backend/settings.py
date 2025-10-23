@@ -79,6 +79,17 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# CORS Configuration - MUST be at the top of middleware
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://jeeva-ai-frontend-gamma.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081"
+]
+
 ROOT_URLCONF = 'jeeva_ai_backend.urls'
 
 TEMPLATES = [
@@ -187,20 +198,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "https://jeeva-ai-frontend-gamma.vercel.app",
-    "https://jeeva-ai-frontend.vercel.app",
-    "https://jeeva-ai.vercel.app",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080", 
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8081",
-    "http://127.0.0.1:8081"
-]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins temporarily for debugging
+# CORS settings - moved to top of file for proper middleware order
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',

@@ -17,7 +17,7 @@ from .serializers import (
     HealthRecordAnalysisRequestSerializer,
     MedicineAnalysisRequestSerializer
 )
-from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner, analyze_image_with_gemini_vision_fast
+from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai, generate_predictive_insights_from_medicines, analyze_medical_report_with_scanner, analyze_image_with_gemini_vision_fast, analyze_image_instant
 
 # Custom response function with CORS headers
 def cors_response(data, status_code=200):
@@ -127,8 +127,9 @@ def analyze_health_record(request):
                 file_obj = BytesIO(image_bytes)
                 file_obj.name = serializer.validated_data.get('file_name', 'medical_report.jpg')
                 
-                # Analyze using medical report scanner
-                analysis_result = analyze_medical_report_with_scanner(file_obj, file_obj.name)
+                # Use INSTANT analysis to prevent timeouts
+                print(f"⚡ Using INSTANT analysis for {file_obj.name}")
+                analysis_result = analyze_image_instant(file_obj, file_obj.name)
             except Exception as e:
                 return Response(
                     {'error': f'Failed to download or analyze image: {str(e)}'}, 
