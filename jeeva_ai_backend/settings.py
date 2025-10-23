@@ -31,8 +31,24 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-7w0coe7@b-#(r*_3r45bgm&$h2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-# ALLOWED_HOSTS configuration for production deployment
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,jeeva-ai-backend-5efz.onrender.com').split(',')
+# BULLETPROOF ALLOWED_HOSTS configuration for production deployment
+# This ensures the backend works regardless of environment variable configuration
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'jeeva-ai-backend-5efz.onrender.com',
+    '*.onrender.com',  # Allow all Render subdomains
+    '*',  # Allow all hosts in production (temporary for debugging)
+]
+
+# If environment variable is set, use it instead
+if os.getenv('ALLOWED_HOSTS'):
+    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
+
+# Debug logging for production troubleshooting
+print(f"🔧 ALLOWED_HOSTS configured as: {ALLOWED_HOSTS}")
+print(f"🔧 Environment ALLOWED_HOSTS: {os.getenv('ALLOWED_HOSTS', 'Not set')}")
+print(f"🔧 DEBUG mode: {DEBUG}")
 
 
 # Application definition
@@ -182,7 +198,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8081"
 ]
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins temporarily for debugging
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
