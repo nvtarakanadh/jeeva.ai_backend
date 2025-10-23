@@ -78,6 +78,10 @@ def analyze_prescription(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print(f"❌ Health record analysis failed with error: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         return Response(
             {'error': f'Analysis failed: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -89,9 +93,16 @@ def analyze_prescription(request):
 def analyze_health_record(request):
     """Analyze health record data using AI"""
     try:
+        print(f"🔍 Received request data: {request.data}")
+        print(f"🔍 Request content type: {request.content_type}")
+        
         serializer = HealthRecordAnalysisRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            print(f"❌ Serializer validation failed: {serializer.errors}")
+            return Response({
+                'error': 'Invalid request data',
+                'details': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if this is an image upload (has file_url)
         if serializer.validated_data.get('file_url') and not serializer.validated_data.get('description'):
@@ -290,7 +301,8 @@ def health_check(request):
     return Response({
         'status': 'healthy',
         'message': 'Jeeva AI Backend is running',
-        'timestamp': timezone.now().isoformat()
+        'timestamp': timezone.now().isoformat(),
+        'version': '1.0.0'
     }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
