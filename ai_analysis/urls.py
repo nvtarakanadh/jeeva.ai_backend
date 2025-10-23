@@ -1,15 +1,17 @@
 from django.urls import path
 from . import views
 from . import simple_views
+from . import cors_fix
+from . import health_fix
 
 urlpatterns = [
     path('analyze/prescription/', views.analyze_prescription, name='analyze_prescription'),
-    path('analyze/health-record/', simple_views.analyze_health_record_simple, name='analyze_health_record'),
+    path('analyze/health-record/', cors_fix.analyze_health_record_cors_fix, name='analyze_health_record'),
     path('analyze/medical-report/', views.analyze_medical_report, name='analyze_medical_report'),
     path('analyze/medicines/', views.analyze_medicines, name='analyze_medicines'),
     path('analysis/<str:record_id>/', views.get_analysis, name='get_analysis'),
     path('analyses/', views.list_analyses, name='list_analyses'),
-    path('health/', views.health_check, name='health_check'),
+    path('health/', health_fix.health_check_cors_fix, name='health_check'),
     path('test-structure/', views.test_response_structure, name='test_response_structure'),
     # File upload endpoints
     path('upload/prescription-file/', views.upload_prescription_file, name='upload_prescription_file'),
