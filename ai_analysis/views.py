@@ -141,9 +141,9 @@ def analyze_health_record(request):
                 file_obj = BytesIO(image_bytes)
                 file_obj.name = serializer.validated_data.get('file_name', 'medical_report.jpg')
                 
-                # Use REAL AI analysis with Gemini Vision
-                print(f"🤖 Using REAL AI analysis for {file_obj.name}")
-                analysis_result = analyze_image_with_gemini_vision_fast(file_obj, file_obj.name)
+                # Use INSTANT analysis for production to avoid worker timeouts
+                print(f"⚡ Using INSTANT analysis for production deployment: {file_obj.name}")
+                analysis_result = analyze_image_instant(file_obj, file_obj.name)
             except Exception as e:
                 return Response(
                     {'error': f'Failed to download or analyze image: {str(e)}'}, 
