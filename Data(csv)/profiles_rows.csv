@@ -1,8 +1,0 @@
-id,user_id,full_name,email,phone,date_of_birth,gender,blood_group,allergies,emergency_contact_name,emergency_contact_phone,emergency_contact_relationship,role,specialization,license_number,hospital_affiliation,created_at,updated_at,verified,qualifications,years_of_experience
-1e496aff-6221-495e-b017-71a440548b0d,273f495e-4e03-4dc0-8444-f2228de590c7,SR Dugal,srdugal@icriindia.com,,,,,,,,,patient,,,,2025-10-03 09:20:14.740288+00,2025-10-03 09:20:14.740288+00,false,,
-4e77d0cc-c61a-4aa1-9435-f294d8b29e4e,8c355540-8d2e-4706-aa79-e20f294282a0,Taraka Nadh Nanduri,tarakanadh99@gmail.com,99491 93254,2003-09-28,male,O+,[],,,,doctor,,,,2025-09-28 12:50:20.365054+00,2025-10-01 13:34:18.084611+00,false,,
-889ae532-a602-433b-88b9-cd0323913135,99a7511b-60dd-43de-a7d3-0e174b822241,Venkata Taraka Nadh Nanduri,nvtarakanadh@gmail.com,,,,,,,,,patient,,,,2025-09-30 10:21:27.890033+00,2025-09-30 10:21:27.890033+00,false,,
-8cce0af3-c376-470f-a49a-85f9455ead7c,379923fd-5041-4f40-a084-6dff0b9f2211,Ravi RS Nadimpalli,rs.nadimpalli@gmail.com,,,,,,,,,patient,,,,2025-10-02 02:28:45.700615+00,2025-10-02 02:28:45.700615+00,false,,
-b8157e7c-28e5-40dc-a80a-4b350be488d9,2d0a43c7-e6ef-4433-a2b2-ba63fcd08e82,SR Dugal,sukritidugal@icriindia.com,,,,,,,,,doctor,,,,2025-10-03 09:20:59.950584+00,2025-10-03 09:20:59.950584+00,false,,
-cfcce49f-9337-4490-ac1a-9f8bc2f75359,65e75ef3-f13a-44c6-94ae-5307a5508660,Ravi RS Nadimpalli,ravisankar.nadimpalli@gmail.com,,,,,,,,,doctor,,,,2025-10-02 02:29:48.150161+00,2025-10-02 02:29:48.150161+00,false,,
-e609cdf5-1da8-4bfe-9e29-4313a474d3ab,dbde7e7c-bd8d-4b81-b527-2f08be22c0f9,Taraka Nadh,tarakanadhnanduri@gmail.com,,,,,,,,,patient,,,,2025-09-28 12:51:54.96043+00,2025-09-28 12:51:54.96043+00,false,,

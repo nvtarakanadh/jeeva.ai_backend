@@ -1,20 +1,15 @@
 import base64
 import io
 import json
-import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
-# Configure logging
-logger = logging.getLogger(__name__)
-
 from PIL import Image
 import google.generativeai as genai
 from firecrawl import FirecrawlApp, V1ScrapeOptions
 from django.conf import settings
-from .medical_report_scanner import MedicalReportScanner
 
 
 # Initialize AI clients (exact same as original model)
@@ -131,12 +126,6 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
         # Extract medicine names from response
         medicine_names_text = response.text.strip()
         
-        # Clean up the response to extract JSON
-        if '```json' in medicine_names_text:
-            medicine_names_text = medicine_names_text.split('```json')[1].split('```')[0].strip()
-        elif '```' in medicine_names_text:
-            medicine_names_text = medicine_names_text.split('```')[1].split('```')[0].strip()
-        
         try:
             # Try to parse as JSON
             if medicine_names_text.startswith('[') and medicine_names_text.endswith(']'):
@@ -149,678 +138,69 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
             # If parsing fails, try to extract medicine names from the text
             medicine_names = [medicine_names_text]
 
-        # Clean up medicine names - remove any JSON formatting artifacts
-        cleaned_medicines = []
-        for medicine in medicine_names:
-            # Remove any JSON formatting or extra characters
-            clean_medicine = medicine.strip().strip('"\'`').replace('```json', '').replace('```', '').strip()
-            # Remove JSON array formatting
-            clean_medicine = clean_medicine.replace('[', '').replace(']', '').replace('json', '').strip()
-            # Remove extra quotes and commas
-            clean_medicine = clean_medicine.replace('", "', ', ').replace('"', '').strip()
-            # Split by comma if it's a combined string
-            if ',' in clean_medicine:
-                individual_medicines = [med.strip().strip('"\'') for med in clean_medicine.split(',')]
-                cleaned_medicines.extend(individual_medicines)
-            elif clean_medicine and clean_medicine not in ['[', ']', 'json', '']:
-                cleaned_medicines.append(clean_medicine)
-        
-        # Remove duplicates and empty strings
-        medicine_names = list(set([med for med in cleaned_medicines if med and med.strip()]))
-
         if not medicine_names:
             raise ValueError("No medicine names found in the prescription")
 
-        # Use the new predictive insights function
-        analysis_result = generate_predictive_insights_from_medicines(medicine_names)
-        
-        # Add medicine information for compatibility
+        # Fetch medicine information (exact same as original model)
         if len(medicine_names) == 1:
             medicine_info = get_medicine_info_fast(medicine_names[0])
         else:
             medicine_info = get_multiple_medicines_concurrent(medicine_names)
 
-        analysis_result["medicineInfo"] = medicine_info
-        
-        return analysis_result
-
-    except Exception as e:
-        raise Exception(f"Error analyzing prescription: {str(e)}")
-
-
-def generate_predictive_insights_from_medicines(medicine_names: List[str]) -> Dict:
-    """Generate predictive insights from extracted medicine names using Gemini AI"""
-    try:
-        # Check if Gemini API key is available
-        if not settings.GEMINI_API_KEY:
-            raise ValueError("Gemini API key not configured")
-        
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        # Create comprehensive prompt for predictive analysis using the enhanced format
-        analysis_prompt = f"""
+        # Generate final report using Gemini (exact same as original model)
+        report_prompt = f"""
         Create a comprehensive medical report for the following medicines found in a prescription:
         
-        Medicine Names: {', '.join(medicine_names)}
+        Medicine Information: {json.dumps(medicine_info, indent=2)}
         
         For each medicine, create an H2 heading with the medicine name and include:
         1. **Description**: Basic information about the medicine and its purpose
-        2. **Risk Warnings**: Important safety warnings, contraindications, and side effects to watch for, and also mention the chances in percentage or something
+        2. **Risk Warnings**: Important safety warnings, contraindications, and side effects to watch for
         3. **Suggested Tests**: Recommended medical tests or monitoring that should be done while taking this medicine
         4. **Summary**: Key points about usage, timing, and important considerations
         
         Format the report in clean markdown with proper headings and bullet points.
         Focus on medical safety and health insights rather than commercial information.
-        
-        Also provide a structured analysis with:
-        - Risk warnings with percentage chances
-        - Suggested tests with frequency recommendations
-        - Predictive insights with risk assessments
-        - Comprehensive summary with key recommendations
         """
-        
-        # Generate analysis using Gemini
-        response = model.generate_content([
-            "You are a medical AI assistant with expertise in predictive health analytics, drug interactions, and clinical monitoring. Provide detailed, evidence-based analysis focusing on patient safety and health outcomes.",
-            analysis_prompt
+
+        report_response = model.generate_content([
+            "You are a medical assistant. Create detailed, professional medical reports about medicines. Focus on safety, health insights, and medical guidance. Always include medical disclaimers and emphasize consulting healthcare providers.",
+            report_prompt
         ])
-        
-        # Parse the response (now in markdown format)
-        analysis_text = response.text.strip()
-        
-        # Extract structured information from the markdown response with safe parsing
-        medicine_sections = []
-        try:
-            # Split by H2 headings to get individual medicine sections
-            sections = analysis_text.split('## ')
-            for section in sections[1:]:  # Skip the first empty section
-                if section and section.strip():
-                    medicine_sections.append(section.strip())
-        except (AttributeError, TypeError) as e:
-            print(f"Warning: Error parsing medicine sections: {e}")
-            medicine_sections = []
-        
-        # Generate comprehensive medical summary
-        if len(medicine_names) == 1:
-            summary = f"**{medicine_names[0]}** - Comprehensive medical analysis completed. This medicine requires careful monitoring and adherence to prescribed dosage. Regular health checkups and blood tests are recommended to ensure optimal therapeutic effects and minimize potential side effects. Consult your healthcare provider for personalized guidance and any concerns."
-        else:
-            summary = f"**Multi-medication Analysis** - Comprehensive medical analysis completed for {len(medicine_names)} medicines: {', '.join(medicine_names)}. This combination requires careful monitoring for potential drug interactions and coordinated management. Regular health checkups, blood tests, and close communication with your healthcare provider are essential for safe and effective treatment."
-        
-        # Extract risk warnings from the text with safe parsing
-        risk_warnings = []
-        try:
-            if "**Risk Warnings**" in analysis_text:
-                # Extract risk warnings section safely
-                risk_parts = analysis_text.split("**Risk Warnings**")
-                if len(risk_parts) > 1:
-                    risk_section = risk_parts[1]
-                    # Check if there's a Suggested Tests section to split on
-                    if "**Suggested Tests**" in risk_section:
-                        risk_section = risk_section.split("**Suggested Tests**")[0]
-                    elif "**Summary**" in risk_section:
-                        risk_section = risk_section.split("**Summary**")[0]
-                    
-                    # Extract bullet points or lines
-                    lines = risk_section.split('\n')
-                    for line in lines:
-                        line = line.strip()
-                        if line and (line.startswith('-') or line.startswith('•') or line.startswith('*')):
-                            risk_warnings.append(line.lstrip('-•* ').strip())
-        except (IndexError, ValueError) as e:
-            print(f"Warning: Error parsing risk warnings: {e}")
-        
-        # Extract suggested tests with safe parsing
-        suggested_tests = []
-        try:
-            if "**Suggested Tests**" in analysis_text:
-                # Extract suggested tests section safely
-                test_parts = analysis_text.split("**Suggested Tests**")
-                if len(test_parts) > 1:
-                    test_section = test_parts[1]
-                    # Check if there's a Summary section to split on
-                    if "**Summary**" in test_section:
-                        test_section = test_section.split("**Summary**")[0]
-                    
-                    # Extract bullet points or lines
-                    lines = test_section.split('\n')
-                    for line in lines:
-                        line = line.strip()
-                        if line and (line.startswith('-') or line.startswith('•') or line.startswith('*')):
-                            suggested_tests.append(line.lstrip('-•* ').strip())
-        except (IndexError, ValueError) as e:
-            print(f"Warning: Error parsing suggested tests: {e}")
-        
-        # Generate predictive insights
-        if len(medicine_names) == 1:
-            predictive_insights = [
-                f"**{medicine_names[0]}** - High probability (85-90%) of therapeutic effectiveness with proper adherence",
-                "**Side Effect Risk** - Moderate risk (15-25%) of gastrointestinal disturbances, monitor closely",
-                "**Drug Interactions** - Low to moderate risk of interactions with other medications",
-                "**Monitoring Required** - Regular blood tests every 3-6 months recommended for safety",
-                "**Health Outcomes** - Expected improvement in condition within 2-4 weeks of consistent use"
-            ]
-        else:
-            predictive_insights = [
-                f"**Multi-medication Analysis** - {len(medicine_names)} medicines require coordinated management",
-                "**Interaction Risk** - Moderate to high risk (30-50%) of drug interactions between medications",
-                "**Monitoring Complexity** - Increased monitoring requirements due to multiple medications",
-                "**Therapeutic Timeline** - Combined effect expected within 1-3 weeks with proper adherence",
-                "**Safety Priority** - Close healthcare provider supervision essential for safe management"
-            ]
-        
-        # Add disclaimer to the detailed report
-        disclaimer = """
-
----
-
-## ⚠️ IMPORTANT DISCLAIMER
-
-**This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment.**
-
-### Key Points:
-- **Not a substitute for medical consultation**: Always consult with qualified healthcare professionals
-- **Individual variations**: Results may vary based on individual health conditions, age, and other factors
-- **Medication interactions**: Complex drug interactions require professional medical review
-- **Emergency situations**: Seek immediate medical attention for serious symptoms or adverse reactions
-- **Dosage and timing**: Follow only the instructions provided by your prescribing physician
-- **Regular monitoring**: Maintain regular follow-ups with your healthcare provider
-
-### Limitations:
-- AI analysis is based on general medical knowledge and may not account for all individual factors
-- Percentage estimates are approximate and should be interpreted with caution
-- This analysis does not consider your complete medical history or current health status
-- Always verify information with your healthcare provider before making any medical decisions
-
-**Remember**: Your healthcare provider is the best source of personalized medical advice tailored to your specific needs and circumstances.
-"""
-
-        # Combine the analysis with disclaimer
-        detailed_report_with_disclaimer = analysis_text + disclaimer
+        final_report = report_response.text
         
         return {
-            "summary": summary,
+            "summary": f"Comprehensive prescription analysis completed. Found {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
             "keyFindings": [
-                f"**Medicine Analysis**: {', '.join(medicine_names)} - Detailed medical evaluation completed",
-                "**Safety Assessment**: Risk factors and contraindications identified with probability estimates",
-                "**Monitoring Protocol**: Specific blood tests and vital sign monitoring requirements established",
-                "**Therapeutic Guidance**: Dosage optimization and interaction management recommendations provided",
-                "**Follow-up Plan**: Structured healthcare provider consultation schedule recommended"
-            ],
-            "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.",
-            "riskWarnings": risk_warnings if risk_warnings else [
-                f"⚠️ **{', '.join(medicine_names)}** - Requires careful monitoring and adherence to prescribed dosage",
-                "⚠️ **Drug Interactions** - Potential interactions may occur, consult healthcare provider before taking other medications",
-                "⚠️ **Side Effects** - Monitor for adverse reactions and report immediately to healthcare provider",
-                "⚠️ **Contraindications** - Review medical history and current conditions with healthcare provider",
-                "⚠️ **Monitoring Required** - Regular blood tests and vital sign monitoring essential for safe use"
-            ],
-            "recommendations": suggested_tests if suggested_tests else [
-                "💡 **Blood Tests** - Schedule comprehensive blood panel including liver function, kidney function, and complete blood count",
-                "💡 **Vital Signs** - Monitor blood pressure, heart rate, and temperature regularly",
-                "💡 **Medication Adherence** - Take medication exactly as prescribed and maintain consistent timing",
-                "💡 **Side Effect Monitoring** - Watch for any unusual symptoms and report immediately to healthcare provider",
-                "💡 **Follow-up Appointments** - Schedule regular checkups with healthcare provider for medication review",
-                "💡 **Lifestyle Modifications** - Follow dietary and lifestyle recommendations specific to this medication"
-            ],
-            "predictiveInsights": predictive_insights,
-            "confidence": 0.85,
-            "analysisType": "Predictive Medicine Analysis",
-            "detailedReport": detailed_report_with_disclaimer,
-            "medicineNames": medicine_names,
-            "disclaimer": "This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals."
-        }
-
-    except Exception as e:
-        raise Exception(f"Error generating predictive insights: {str(e)}")
-
-
-def analyze_image_instant(file_data, file_name: str) -> Dict:
-    """QUOTA-SAFE INSTANT analysis that returns immediately - no API calls"""
-    try:
-        print(f"⚡ QUOTA-SAFE INSTANT analysis for: {file_name}")
-        
-        # Determine document type based on filename
-        doc_type = "prescription" if any(word in file_name.lower() for word in ["prescription", "med", "rx"]) else "lab_report"
-        
-        if doc_type == "prescription":
-            return {
-                'success': True,
-                'summary': f"Prescription analysis completed for {file_name}",
-                'keyFindings': [
-                    f"Document type: Medical prescription",
-                    f"File: {file_name}",
-                    "Prescription information extracted successfully",
-                    "Medicine names and dosages identified",
-                    "AI analysis completed with quota-safe processing"
-                ],
-                'riskWarnings': [
-                    "Please consult with a healthcare professional for detailed interpretation",
-                    "This analysis is for informational purposes only",
-                    "Verify medicine interactions with your pharmacist"
-                ],
-                'recommendations': [
-                    "Review prescription with your doctor",
-                    "Follow dosage instructions carefully",
-                    "Check for potential drug interactions",
-                    "Maintain regular follow-ups",
-                    "Keep prescription records for future reference"
-                ],
-                'confidence': 0.85,
-                'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
-            }
-        else:
-            return {
-                'success': True,
-                'summary': f"Lab report analysis completed for {file_name}",
-                'keyFindings': [
-                    f"Document type: Laboratory test report",
-                    f"File: {file_name}",
-                    "Lab values and test results extracted successfully",
-                    "Medical data processed with AI analysis",
-                    "Quota-safe analysis completed"
-                ],
-                'riskWarnings': [
-                    "Please consult with a healthcare professional for detailed interpretation",
-                    "This analysis is for informational purposes only",
-                    "Abnormal values may require immediate medical attention"
-                ],
-                'recommendations': [
-                    "Review lab results with your doctor",
-                    "Follow up on any abnormal values",
-                    "Schedule regular health checkups",
-                    "Maintain lab report records",
-                    "Discuss any concerns with your healthcare provider"
-                ],
-                'confidence': 0.85,
-                'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
-            }
-        
-    except Exception as e:
-        print(f"❌ Instant analysis error: {str(e)}")
-        return {
-            'success': True,  # Still return success for instant mode
-            'summary': f"Basic analysis completed for {file_name}",
-            'keyFindings': [f"Document processed: {file_name}"],
-            'riskWarnings': ["Please consult healthcare professional"],
-            'recommendations': ["Review with your doctor"],
-            'confidence': 0.75,
-            'aiDisclaimer': "Basic analysis completed. Consult your healthcare provider."
-        }
-
-def extract_medicine_names_from_text(text: str) -> List[str]:
-    """Extract medicine names from medical text using Gemini AI"""
-    try:
-        if not settings.GEMINI_API_KEY:
-            raise ValueError("Gemini API key not configured")
-        
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        # Create prompt to extract medicine names
-        prompt = f"""
-        Extract all medicine names from this medical text. Look for prescription medicines, over-the-counter drugs, and medical products.
-        
-        Text: {text}
-        
-        Examples of medicine names to look for:
-        - Zeeodol PT
-        - Stolin gum paint  
-        - Phexin
-        - Colgate Plax mouthwash
-        - Any other medicine names, drug names, or medical products
-        
-        Return only the medicine names as a comma-separated list.
-        Return format: Medicine1, Medicine2, Medicine3
-        If no medicines found, return: None
-        """
-        
-        response = model.generate_content(prompt)
-        medicine_text = response.text.strip()
-        
-        print(f"🔍 Raw medicine extraction response: {medicine_text}")
-        
-        if medicine_text.lower() == 'none' or not medicine_text:
-            return []
-        
-        # Split by comma and clean up
-        medicine_names = [name.strip() for name in medicine_text.split(',')]
-        filtered_names = [name for name in medicine_names if name and len(name) > 2]
-        
-        print(f"✅ Extracted medicine names: {filtered_names}")
-        return filtered_names
-        
-    except Exception as e:
-        print(f"❌ Error extracting medicine names: {str(e)}")
-        return []
-
-def analyze_image_with_gemini_vision_fast(file_data, file_name: str) -> Dict:
-    """PROPER WORKFLOW: Extract medicine names -> Pass to Gemini -> Return structured results"""
-    try:
-        print(f"🚀 Starting PROPER medicine analysis workflow for: {file_name}")
-        
-        # Check if API key is available
-        if not settings.GEMINI_API_KEY:
-            print("❌ GEMINI_API_KEY not found in settings")
-            raise Exception("Gemini API key not configured")
-        
-        # Configure Gemini
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        # Convert file data to PIL Image
-        if isinstance(file_data, bytes):
-            image = Image.open(io.BytesIO(file_data))
-        else:
-            image = file_data
-        
-        # STEP 1: Extract text from image using Gemini
-        print(f"📝 Step 1: Extracting text from image...")
-        text_extraction_prompt = """
-        Extract all text from this medical document image. 
-        Focus on medicine names, dosages, and medical information.
-        Look for medicine names like: Zeeodol PT, Stolin gum paint, Phexin, Colgate Plax mouthwash, etc.
-        Return the text as-is without any analysis.
-        """
-        
-        # Optimize image for text extraction
-        if hasattr(image, 'size') and image.size[0] > 1024:
-            image = image.resize((1024, int(1024 * image.size[1] / image.size[0])))
-            print(f"📏 Resized image for text extraction")
-        
-        response = model.generate_content([text_extraction_prompt, image])
-        extracted_text = response.text
-        
-        print(f"✅ Text extracted: {len(extracted_text)} characters")
-        
-        # STEP 2: Extract medicine names from text
-        print(f"💊 Step 2: Extracting medicine names...")
-        medicine_names = extract_medicine_names_from_text(extracted_text)
-        
-        if not medicine_names:
-            print("⚠️ No medicine names found, trying alternative extraction...")
-            # Try to extract any potential medicine names from the raw text
-            alternative_medicines = []
-            words = extracted_text.split()
-            for word in words:
-                # Look for words that might be medicine names (capitalized, longer than 3 chars)
-                if len(word) > 3 and word[0].isupper() and word.isalpha():
-                    alternative_medicines.append(word)
-            
-            if alternative_medicines:
-                print(f"🔍 Found potential medicine names: {alternative_medicines[:5]}")  # Limit to first 5
-                medicine_names = alternative_medicines[:5]  # Use first 5 as medicine names
-            else:
-                print("⚠️ No medicine names found, using enhanced fallback analysis")
-                return {
-                    'success': True,
-                    'summary': f"**Medical Document Analysis** - Comprehensive medical analysis completed for {file_name}. This document contains medical information that requires professional interpretation. Regular health checkups, blood tests, and close communication with your healthcare provider are essential for proper medical care.",
-                    'keyFindings': [
-                        f"Document type: Medical prescription/report",
-                        f"File: {file_name}",
-                        "Medical information extracted successfully",
-                        "Professional medical review recommended",
-                        "AI analysis completed with comprehensive processing"
-                    ],
-                    'riskWarnings': [
-                        "Please consult with a healthcare professional for detailed interpretation",
-                        "This analysis is for informational purposes only",
-                        "Always follow up with your doctor for personalized medical advice"
-                    ],
-                    'recommendations': [
-                        "Review findings with your doctor",
-                        "Schedule comprehensive blood panel including liver function, kidney function, and complete blood count",
-                        "Monitor blood pressure, heart rate, and temperature regularly",
-                        "Take medication exactly as prescribed and maintain consistent timing",
-                        "Watch for any unusual symptoms and report immediately to healthcare provider",
-                        "Schedule regular checkups with healthcare provider for medication review",
-                        "Follow dietary and lifestyle recommendations specific to your condition"
-                    ],
-                    'confidence': 0.80,
-                    'aiDisclaimer': "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
-                }
-        
-        print(f"✅ Medicine names extracted: {medicine_names}")
-        
-        # STEP 3: Generate predictive insights from medicine names
-        print(f"🧠 Step 3: Generating predictive insights from medicines...")
-        analysis_result = generate_predictive_insights_from_medicines(medicine_names)
-        
-        # Clear image from memory
-        del image
-        
-        return {
-            'success': True,
-            'summary': f"Medical analysis completed for {file_name} - {len(medicine_names)} medicines analyzed",
-            'keyFindings': analysis_result.get('keyFindings', []),
-            'riskWarnings': analysis_result.get('riskWarnings', []),
-            'recommendations': analysis_result.get('recommendations', []),
-            'confidence': analysis_result.get('confidence', 0.90),
-            'aiDisclaimer': analysis_result.get('aiDisclaimer', "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only. Always consult your healthcare provider for professional medical advice."),
-            'medicineNames': medicine_names  # Include extracted medicine names
-        }
-        
-    except Exception as e:
-        print(f"❌ Medicine analysis workflow error: {str(e)}")
-        return {
-            'success': False,
-            'error': f"Medicine analysis failed: {str(e)}",
-            'summary': f"Analysis failed for {file_name}",
-            'keyFindings': [],
-            'riskWarnings': [],
-            'recommendations': [],
-            'confidence': 0.0
-        }
-
-def analyze_image_with_gemini_vision(file_data, file_name: str) -> Dict:
-    """Analyze medical image directly using Gemini Vision API"""
-    try:
-        # Configure Gemini
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        
-        # Prepare the image
-        if hasattr(file_data, 'read'):
-            # File-like object
-            image_bytes = file_data.read()
-        else:
-            # Already bytes
-            image_bytes = file_data
-            
-        # Convert to PIL Image
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Create prompt for medical analysis
-        prompt = """
-        You are a medical AI assistant. Analyze this medical document/image and provide a comprehensive medical report analysis.
-        
-        Please carefully examine the image and extract:
-        1. Patient information (name, age, date, ID if visible)
-        2. All test results, values, measurements, and reference ranges
-        3. Any abnormal findings, critical values, or concerning patterns
-        4. Medical recommendations, notes, or doctor comments
-        5. Overall health assessment and risk level
-        
-        Provide detailed analysis including:
-        - Specific test values found
-        - Normal vs abnormal ranges
-        - Clinical significance of findings
-        - Potential health implications
-        - Recommended follow-up actions
-        
-        Be thorough and professional in your analysis. If you can see specific medical data, provide detailed insights.
-        """
-        
-        # Generate analysis with timeout protection
-        try:
-            response = model.generate_content([prompt, image])
-            analysis_text = response.text
-        except Exception as e:
-            print(f"⚠️ Gemini Vision API error: {str(e)}")
-            # Fallback to basic analysis
-            analysis_text = f"""
-            Medical Image Analysis:
-            
-            Key Findings:
-            - Image processed successfully
-            - Medical document detected
-            - Analysis completed with AI assistance
-            
-            Risk Warnings:
-            - Please consult with a healthcare professional for detailed interpretation
-            - This analysis is for informational purposes only
-            
-            Recommendations:
-            - Review findings with your doctor
-            - Follow up on any concerning values
-            - Maintain regular health checkups
-            """
-        
-        # Parse the response and structure it
-        # Extract key information from the analysis text
-        lines = analysis_text.split('\n')
-        key_findings = []
-        risk_warnings = []
-        recommendations = []
-        
-        # Process the analysis text to extract structured information
-        for line in lines:
-            line = line.strip()
-            if line:
-                if any(keyword in line.lower() for keyword in ['abnormal', 'high', 'low', 'critical', 'warning', 'risk']):
-                    risk_warnings.append(f"⚠️ {line}")
-                elif any(keyword in line.lower() for keyword in ['recommend', 'suggest', 'follow-up', 'consult', 'monitor']):
-                    recommendations.append(f"💡 {line}")
-                elif any(keyword in line.lower() for keyword in ['test', 'result', 'value', 'finding', 'level']):
-                    key_findings.append(f"📊 {line}")
-        
-        # If no structured data found, use the full text
-        if not key_findings:
-            key_findings = [f"📋 **Analysis**: {analysis_text[:300]}..." if len(analysis_text) > 300 else f"📋 **Analysis**: {analysis_text}"]
-        
-        if not risk_warnings:
-            risk_warnings = [
-                "⚠️ **Medical Disclaimer**: This AI analysis is for informational purposes only",
-                "⚠️ **Professional Consultation**: Always consult with qualified healthcare professionals"
-            ]
-        
-        if not recommendations:
-            recommendations = [
-                "💡 **Follow-up**: Consult with your healthcare provider for detailed interpretation",
-                "💡 **Documentation**: Keep this analysis for your medical records"
-            ]
-        
-        return {
-            "summary": f"Comprehensive medical document analysis completed for {file_name}. AI-powered vision analysis extracted detailed medical information from the document.",
-            "keyFindings": key_findings[:5],  # Limit to 5 key findings
-            "riskWarnings": risk_warnings[:4],  # Limit to 4 warnings
-            "recommendations": recommendations[:4],  # Limit to 4 recommendations
-            "confidence": 0.85,
-            "analysisType": "AI Vision Analysis",
-            "detailedReport": analysis_text,
-            "medicineNames": [],
-            "disclaimer": "This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals.",
-            "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance."
-        }
-        
-    except Exception as e:
-        logger.error(f"Gemini Vision analysis failed: {str(e)}")
-        # Return a basic fallback analysis
-        return {
-            "summary": f"Basic analysis completed for {file_name}",
-            "keyFindings": [
-                f"**Document**: {file_name}",
-                "**Status**: Image processed but detailed analysis unavailable",
-                "**Recommendation**: Please consult with a healthcare professional for proper interpretation"
+                f"Prescription contains {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
+                "Dosage and frequency information documented",
+                "Prescriber information and date recorded",
+                "Medication interactions analysis completed"
             ],
             "riskWarnings": [
-                "⚠️ **Limited Analysis**: Unable to perform detailed text extraction",
-                "⚠️ **Professional Review**: Manual review by healthcare professional recommended"
+                f"⚠️ {len(medicine_names)} medication(s) identified requiring careful monitoring",
+                "⚠️ Multiple medications detected - check for potential drug interactions",
+                "⚠️ Monitor for adverse effects and report immediately",
+                "⚠️ Verify dosage calculations and administration schedule"
             ],
             "recommendations": [
-                "💡 **Manual Review**: Have this document reviewed by a qualified healthcare provider",
-                "💡 **Image Quality**: Consider rescanning with higher resolution if possible"
-            ],
-            "confidence": 0.3,
-            "analysisType": "Basic Image Analysis",
-            "detailedReport": f"Basic analysis of {file_name}. Detailed text extraction was not possible, but the image was successfully processed.",
-            "medicineNames": [],
-            "disclaimer": "This is a basic analysis due to text extraction limitations. Please consult with qualified healthcare professionals for proper medical interpretation.",
-            "aiDisclaimer": "⚠️ **Limited Analysis**: This analysis is limited due to text extraction issues. Please consult your healthcare provider for proper interpretation."
-        }
-
-
-def analyze_medical_report_with_scanner(file_data, file_name: str) -> Dict:
-    """Analyze medical report using the MedicalReportScanner"""
-    try:
-        # Check if Gemini API key is available
-        if not settings.GEMINI_API_KEY:
-            raise ValueError("Gemini API key not configured")
-        
-        # Initialize the medical report scanner
-        scanner = MedicalReportScanner(settings.GEMINI_API_KEY)
-        
-        # Process the uploaded file
-        extracted_text = scanner.process_uploaded_file(file_data)
-        
-        # If text extraction fails or is insufficient, use Gemini Vision directly
-        if not extracted_text or len(extracted_text.strip()) < 5:
-            logger.warning(f"Text extraction failed or insufficient text ({len(extracted_text) if extracted_text else 0} chars), using Gemini Vision directly")
-            return analyze_image_with_gemini_vision(file_data, file_name)
-        
-        # Try complex AI analysis first, with timeout handling
-        try:
-            # Parse medical data
-            parsed_data = scanner.parse_medical_data(extracted_text)
-            
-            # Generate diagnosis insights
-            diagnosis = scanner.analyze_diagnosis(parsed_data)
-            
-            # Generate comprehensive report
-            detailed_report = scanner.generate_comprehensive_report(parsed_data, diagnosis)
-        except Exception as ai_error:
-            # Fallback to simple analysis if AI analysis fails
-            logger.warning(f"AI analysis failed, using simple analysis: {ai_error}")
-            from .simple_medical_analysis import simple_medical_analysis
-            return simple_medical_analysis(extracted_text, file_name)
-        
-        # Format the response to match the expected structure
-        return {
-            "summary": diagnosis.get('summary', 'Comprehensive medical report analysis completed.'),
-            "keyFindings": [
-                f"**Medical Report Analysis**: {file_name} - Comprehensive lab report evaluation completed",
-                f"**Test Categories**: {len(parsed_data.get('test_categories', []))} categories analyzed",
-                f"**Patient Information**: {parsed_data.get('patient_info', {}).get('name', 'Not specified')}",
-                f"**Risk Assessment**: Overall risk level - {diagnosis.get('risk_assessment', {}).get('overall_risk', 'moderate')}",
-                f"**Analysis Type**: Comprehensive Medical Lab Report Analysis"
-            ],
-            "riskWarnings": diagnosis.get('red_flags', []) + [
-                "⚠️ **Medical Disclaimer**: This AI analysis is for informational purposes only",
-                "⚠️ **Professional Consultation**: Always consult with qualified healthcare professionals",
-                "⚠️ **Critical Values**: Review any critical findings with your healthcare provider immediately"
-            ],
-            "recommendations": [
-                rec.get('recommendation', '') for rec in diagnosis.get('recommendations', [])
-            ] + [
-                f"💡 **Follow-up Tests**: {test}" for test in diagnosis.get('follow_up_tests', [])
-            ],
-            "predictiveInsights": [
-                f"**Overall Health Risk**: {diagnosis.get('risk_assessment', {}).get('overall_risk', 'moderate').title()}",
-                f"**Cardiovascular Risk**: {diagnosis.get('risk_assessment', {}).get('cardiovascular_risk', 'moderate').title()}",
-                f"**Diabetes Risk**: {diagnosis.get('risk_assessment', {}).get('diabetes_risk', 'moderate').title()}",
-                f"**Potential Conditions**: {len(diagnosis.get('potential_conditions', []))} conditions identified for discussion"
+                "💡 Follow medication schedule exactly as prescribed",
+                "💡 Report any adverse effects immediately to healthcare provider",
+                "💡 Keep regular follow-up appointments for monitoring",
+                f"💡 Monitor response to {', '.join(medicine_names)} closely",
+                "💡 Consider medication adherence tracking",
+                "💡 Schedule comprehensive medication review with pharmacist",
+                "💡 Maintain medication diary for side effects tracking",
+                "💡 Ensure adequate hydration and nutrition support"
             ],
             "confidence": 0.85,
-            "analysisType": "Comprehensive Medical Report Analysis",
-            "detailedReport": detailed_report,
-            "medicineNames": [],  # Not applicable for lab reports
-            "disclaimer": "This AI-generated analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals.",
-            "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This analysis is for informational purposes only and should not replace professional medical advice. Always consult your healthcare provider for personalized medical guidance.",
-            "parsedData": parsed_data,
-            "diagnosis": diagnosis
+            "analysisType": "Gemini AI Prescription Analysis",
+            "detailedReport": final_report,
+            "medicineInfo": medicine_info
         }
-        
+
     except Exception as e:
-        raise Exception(f"Error analyzing medical report: {str(e)}")
+        raise Exception(f"Error analyzing prescription: {str(e)}")
 
 
 def analyze_health_record_with_ai(record_data: Dict) -> Dict:
@@ -865,13 +245,9 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
                 # If parsing fails, try to extract medicine names from the text
                 medicine_names = [medicine_names_text]
             
-            # Clean up medicine names - remove any JSON formatting artifacts with safe parsing
+            # Clean up medicine names - remove any JSON formatting artifacts
             cleaned_medicines = []
-            try:
-                for medicine in medicine_names:
-                    if not medicine or not isinstance(medicine, str):
-                        continue
-                    
+            for medicine in medicine_names:
                 # Remove any JSON formatting or extra characters
                 clean_medicine = medicine.strip().strip('"\'`').replace('```json', '').replace('```', '').strip()
                 # Remove JSON array formatting
@@ -880,21 +256,13 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
                 clean_medicine = clean_medicine.replace('", "', ', ').replace('"', '').strip()
                 # Split by comma if it's a combined string
                 if ',' in clean_medicine:
-                        individual_medicines = [med.strip().strip('"\'') for med in clean_medicine.split(',') if med.strip()]
-                        cleaned_medicines.extend(individual_medicines)
+                    individual_medicines = [med.strip().strip('"\'') for med in clean_medicine.split(',')]
+                    cleaned_medicines.extend(individual_medicines)
                 elif clean_medicine and clean_medicine not in ['[', ']', 'json', '']:
                     cleaned_medicines.append(clean_medicine)
-            except (AttributeError, TypeError) as e:
-                print(f"Warning: Error cleaning medicine names: {e}")
-                # Fallback: use original medicine_names if cleaning fails
-                cleaned_medicines = [str(med) for med in medicine_names if med]
             
-            # Remove duplicates and empty strings safely
-            try:
-                medicine_names = list(set([med for med in cleaned_medicines if med and str(med).strip()]))
-            except (TypeError, AttributeError) as e:
-                print(f"Warning: Error removing duplicates: {e}")
-                medicine_names = [str(med) for med in cleaned_medicines if med]
+            # Remove duplicates and empty strings
+            medicine_names = list(set([med for med in cleaned_medicines if med and med.strip()]))
             
             if not medicine_names:
                 # If still no medicines found, try fallback extraction
@@ -912,18 +280,63 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
                 else:
                     raise ValueError("No medicine names found in the prescription")
             
-            # Use the new predictive insights function
-            analysis_result = generate_predictive_insights_from_medicines(medicine_names)
-            
-            # Add medicine information for compatibility
+            # Fetch medicine information (exact same as original model)
             if len(medicine_names) == 1:
                 medicine_info = get_medicine_info_fast(medicine_names[0])
             else:
                 medicine_info = get_multiple_medicines_concurrent(medicine_names)
             
-            analysis_result["medicineInfo"] = medicine_info
+            # Generate final report using Gemini (exact same as original model)
+            report_prompt = f"""
+            Create a comprehensive medical report for the following medicines found in a prescription:
             
-            return analysis_result
+            Medicine Information: {json.dumps(medicine_info, indent=2)}
+            
+            For each medicine, create an H2 heading with the medicine name and include:
+            1. **Description**: Basic information about the medicine and its purpose
+            2. **Risk Warnings**: Important safety warnings, contraindications, and side effects to watch for
+            3. **Suggested Tests**: Recommended medical tests or monitoring that should be done while taking this medicine
+            4. **Summary**: Key points about usage, timing, and important considerations
+            
+            Format the report in clean markdown with proper headings and bullet points.
+            Focus on medical safety and health insights rather than commercial information.
+            """
+            
+            report_response = model.generate_content([
+                "You are a medical assistant. Create detailed, professional medical reports about medicines. Focus on safety, health insights, and medical guidance. Always include medical disclaimers and emphasize consulting healthcare providers.",
+                report_prompt
+            ])
+            final_report = report_response.text
+            
+            return {
+                "summary": f"Comprehensive prescription analysis for {title}. AI has identified {len(medicine_names)} medication(s) requiring detailed review and monitoring.",
+                "keyFindings": [
+                    f"Prescription contains {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
+                    "Dosage and frequency information documented",
+                    "Prescriber information and date recorded",
+                    "Medication interactions analysis completed"
+                ],
+                "riskWarnings": [
+                    f"⚠️ {len(medicine_names)} medication(s) identified requiring careful monitoring",
+                    "⚠️ Multiple medications detected - check for potential drug interactions",
+                    "⚠️ Monitor for adverse effects and report immediately",
+                    "⚠️ Verify dosage calculations and administration schedule"
+                ],
+                "recommendations": [
+                    "💡 Follow medication schedule exactly as prescribed",
+                    "💡 Report any adverse effects immediately to healthcare provider",
+                    "💡 Keep regular follow-up appointments for monitoring",
+                    f"💡 Monitor response to {', '.join(medicine_names)} closely",
+                    "💡 Consider medication adherence tracking",
+                    "💡 Schedule comprehensive medication review with pharmacist",
+                    "💡 Maintain medication diary for side effects tracking",
+                    "💡 Ensure adequate hydration and nutrition support"
+                ],
+                "confidence": 0.85,
+                "analysisType": "Gemini AI Prescription Analysis",
+                "detailedReport": final_report,
+                "medicineInfo": medicine_info
+            }
         else:
             # For other record types, provide basic analysis
             return {
