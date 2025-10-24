@@ -100,7 +100,7 @@ def analyze_prescription(request):
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
+            analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
             record_title=health_record.title
         )
         
@@ -186,7 +186,7 @@ def analyze_health_record(request):
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
-            analysis_type=analysis_result['analysisType'],
+            analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
             record_title=health_record.title
         )
         

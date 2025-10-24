@@ -220,6 +220,7 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
                 "riskWarnings": analysis_data["Warnings"],
                 "recommendations": analysis_data["Recommendations"],
                 "confidence": 0.90,
+                "analysisType": "Prescription Analysis",
                 "aiDisclaimer": analysis_data["Disclaimer"],
                 "structuredData": analysis_data
             }
@@ -252,6 +253,7 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
                     "💡 Ensure adequate hydration and nutrition support"
                 ],
                 "confidence": 0.85,
+                "analysisType": "Prescription Analysis",
                 "aiDisclaimer": "⚠️ This AI analysis is for informational purposes only. Please consult your doctor or pharmacist before making any medical decisions.",
                 "structuredData": {
                     "PatientName": "Patient",
