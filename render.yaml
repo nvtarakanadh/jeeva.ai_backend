@@ -2,8 +2,8 @@ services:
   - type: web
     name: jeeva-ai-backend
     env: python
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn jeeva_ai_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --max-requests 5 --max-requests-jitter 1 --worker-class sync --worker-connections 500 --preload
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput
+    startCommand: gunicorn jeeva_ai_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 300
     envVars:
       - key: SECRET_KEY
         value: fc+wt)r77c6kkwosf@(%q=zddf@t*bvt(@s6e#_r2rudp4@5f8
