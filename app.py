@@ -1,8 +1,4 @@
-"""
-WSGI application entry point for Render deployment.
-This file makes the Django WSGI application available as 'app' for gunicorn.
-"""
-
+# WSGI entry point for Render deployment
 import os
 import sys
 import django
