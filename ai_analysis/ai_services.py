@@ -147,57 +147,124 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
         else:
             medicine_info = get_multiple_medicines_concurrent(medicine_names)
 
-        # Generate final report using Gemini (exact same as original model)
-        report_prompt = f"""
-        Create a comprehensive medical report for the following medicines found in a prescription:
+        # Generate structured prescription analysis using Gemini
+        analysis_prompt = f"""
+        Analyze this prescription and return a JSON response with the following structure:
         
         Medicine Information: {json.dumps(medicine_info, indent=2)}
         
-        For each medicine, create an H2 heading with the medicine name and include:
-        1. **Description**: Basic information about the medicine and its purpose
-        2. **Risk Warnings**: Important safety warnings, contraindications, and side effects to watch for
-        3. **Suggested Tests**: Recommended medical tests or monitoring that should be done while taking this medicine
-        4. **Summary**: Key points about usage, timing, and important considerations
+        Return ONLY a valid JSON object with this exact structure:
+        {{
+            "PatientName": "Extract patient name from prescription or use 'Patient' if not found",
+            "Date": "Extract prescription date or use current date",
+            "Medications": [
+                {{
+                    "Name": "<Medicine Name>",
+                    "Purpose": "<e.g., Antibiotic for infection or Pain relief>",
+                    "Dosage": "<e.g., 500 mg>",
+                    "Frequency": "<e.g., Twice a day>",
+                    "Duration": "<e.g., 5 days>"
+                }}
+            ],
+            "PossibleInteractions": [
+                "<Mention any potential medicine interactions or cautions>"
+            ],
+            "Warnings": [
+                "<Important medical or usage warnings related to the prescribed medicines>"
+            ],
+            "Recommendations": [
+                "<Helpful patient advice, such as hydration, diet, rest, or follow-up reminders>"
+            ],
+            "AI_Summary": "<Short and simple summary of what the prescription is for, in plain language>",
+            "RiskLevel": "<Low / Moderate / High (based on complexity or potential risk)>",
+            "Disclaimer": "⚠️ This AI analysis is for informational purposes only. Please consult your doctor or pharmacist before making any medical decisions."
+        }}
         
-        Format the report in clean markdown with proper headings and bullet points.
-        Focus on medical safety and health insights rather than commercial information.
+        For each medicine found, create a detailed entry with purpose, dosage, frequency, and duration.
+        Assess risk level based on: number of medications, potential interactions, and complexity.
         """
 
-        report_response = model.generate_content([
-            "You are a medical assistant. Create detailed, professional medical reports about medicines. Focus on safety, health insights, and medical guidance. Always include medical disclaimers and emphasize consulting healthcare providers.",
-            report_prompt
+        analysis_response = model.generate_content([
+            "You are a medical AI assistant. Analyze prescriptions and return structured JSON data. Focus on patient safety and medical accuracy.",
+            analysis_prompt
         ])
-        final_report = report_response.text
         
-        return {
-            "summary": f"Comprehensive prescription analysis completed. Found {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
-            "keyFindings": [
-                f"Prescription contains {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
-                "Dosage and frequency information documented",
-                "Prescriber information and date recorded",
-                "Medication interactions analysis completed"
-            ],
-            "riskWarnings": [
-                f"⚠️ {len(medicine_names)} medication(s) identified requiring careful monitoring",
-                "⚠️ Multiple medications detected - check for potential drug interactions",
-                "⚠️ Monitor for adverse effects and report immediately",
-                "⚠️ Verify dosage calculations and administration schedule"
-            ],
-            "recommendations": [
-                "💡 Follow medication schedule exactly as prescribed",
-                "💡 Report any adverse effects immediately to healthcare provider",
-                "💡 Keep regular follow-up appointments for monitoring",
-                f"💡 Monitor response to {', '.join(medicine_names)} closely",
-                "💡 Consider medication adherence tracking",
-                "💡 Schedule comprehensive medication review with pharmacist",
-                "💡 Maintain medication diary for side effects tracking",
-                "💡 Ensure adequate hydration and nutrition support"
-            ],
-            "confidence": 0.85,
-            "analysisType": "Gemini AI Prescription Analysis",
-            "detailedReport": final_report,
-            "medicineInfo": medicine_info
-        }
+        try:
+            # Parse the JSON response
+            analysis_data = json.loads(analysis_response.text.strip())
+            
+            # Ensure all required fields are present
+            if not isinstance(analysis_data, dict):
+                raise ValueError("Invalid JSON structure")
+                
+            # Set defaults for missing fields
+            analysis_data.setdefault("PatientName", "Patient")
+            analysis_data.setdefault("Date", "Not specified")
+            analysis_data.setdefault("Medications", [])
+            analysis_data.setdefault("PossibleInteractions", [])
+            analysis_data.setdefault("Warnings", [])
+            analysis_data.setdefault("Recommendations", [])
+            analysis_data.setdefault("AI_Summary", f"Prescription analysis completed for {len(medicine_names)} medication(s)")
+            analysis_data.setdefault("RiskLevel", "Moderate")
+            analysis_data.setdefault("Disclaimer", "⚠️ This AI analysis is for informational purposes only. Please consult your doctor or pharmacist before making any medical decisions.")
+            
+            return {
+                "success": True,
+                "summary": analysis_data["AI_Summary"],
+                "keyFindings": [
+                    f"Patient: {analysis_data['PatientName']}",
+                    f"Date: {analysis_data['Date']}",
+                    f"Medications: {len(analysis_data['Medications'])} found",
+                    f"Risk Level: {analysis_data['RiskLevel']}"
+                ],
+                "riskWarnings": analysis_data["Warnings"],
+                "recommendations": analysis_data["Recommendations"],
+                "confidence": 0.90,
+                "aiDisclaimer": analysis_data["Disclaimer"],
+                "structuredData": analysis_data
+            }
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            # Fallback to original structure if JSON parsing fails
+            return {
+                "success": True,
+                "summary": f"Prescription analysis completed. Found {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
+                "keyFindings": [
+                    f"Prescription contains {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
+                    "Dosage and frequency information documented",
+                    "Prescriber information and date recorded",
+                    "Medication interactions analysis completed"
+                ],
+                "riskWarnings": [
+                    f"⚠️ {len(medicine_names)} medication(s) identified requiring careful monitoring",
+                    "⚠️ Multiple medications detected - check for potential drug interactions",
+                    "⚠️ Monitor for adverse effects and report immediately",
+                    "⚠️ Verify dosage calculations and administration schedule"
+                ],
+                "recommendations": [
+                    "💡 Follow medication schedule exactly as prescribed",
+                    "💡 Report any adverse effects immediately to healthcare provider",
+                    "💡 Keep regular follow-up appointments for monitoring",
+                    f"💡 Monitor response to {', '.join(medicine_names)} closely",
+                    "💡 Consider medication adherence tracking",
+                    "💡 Schedule comprehensive medication review with pharmacist",
+                    "💡 Maintain medication diary for side effects tracking",
+                    "💡 Ensure adequate hydration and nutrition support"
+                ],
+                "confidence": 0.85,
+                "aiDisclaimer": "⚠️ This AI analysis is for informational purposes only. Please consult your doctor or pharmacist before making any medical decisions.",
+                "structuredData": {
+                    "PatientName": "Patient",
+                    "Date": "Not specified",
+                    "Medications": [{"Name": name, "Purpose": "As prescribed", "Dosage": "As directed", "Frequency": "As directed", "Duration": "As prescribed"} for name in medicine_names],
+                    "PossibleInteractions": ["Multiple medications detected - consult pharmacist"],
+                    "Warnings": ["Monitor for adverse effects"],
+                    "Recommendations": ["Follow prescription instructions carefully"],
+                    "AI_Summary": f"Prescription analysis completed for {len(medicine_names)} medication(s)",
+                    "RiskLevel": "Moderate",
+                    "Disclaimer": "⚠️ This AI analysis is for informational purposes only. Please consult your doctor or pharmacist before making any medical decisions."
+                }
+            }
 
     except Exception as e:
         raise Exception(f"Error analyzing prescription: {str(e)}")
