@@ -1671,9 +1671,9 @@ def test_dr7_api_connectivity() -> bool:
         return False
 
 
-def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> Dict:
+def analyze_mri_ct_scan_with_dr7_new(image_bytes: bytes, scan_type: str = "MRI") -> Dict:
     """
-    Analyze MRI/CT scan using Dr7.ai API
+    Analyze MRI/CT scan using Dr7.ai API with correct multimodal endpoint
     
     Args:
         image_bytes: The image file bytes
@@ -1687,71 +1687,93 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
         if not hasattr(settings, 'DR7_API_KEY') or not settings.DR7_API_KEY:
             raise ValueError("Dr7.ai API key not configured")
         
-        # Test API connectivity first
-        print("🔍 Testing Dr7.ai API connectivity...")
-        if not test_dr7_api_connectivity():
-            print("⚠️ Dr7.ai API connectivity test failed, but proceeding with analysis attempt...")
-        
-        # Convert image to base64 and optimize size if needed
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        
         # Check image size and warn if too large
         image_size_mb = len(image_bytes) / (1024 * 1024)
         if image_size_mb > 10:  # If image is larger than 10MB
             print(f"⚠️ Warning: Large image detected ({image_size_mb:.2f}MB). This might cause timeout issues.")
         
-        print(f"🔍 Image size: {image_size_mb:.2f}MB, Base64 size: {len(base64_image)} characters")
+        print(f"🔍 Image size: {image_size_mb:.2f}MB")
         
-        # Try different endpoints for image analysis
-        # Updated endpoints based on Dr7.ai API documentation
-        possible_endpoints = [
-            "https://api.dr7.ai/v1/medical/chat/completions",
-            "https://dr7.ai/api/v1/medical/chat/completions",
-            "https://api.dr7.ai/v1/analyze",
-            "https://dr7.ai/api/v1/analyze"
-        ]
-        
-        api_url = possible_endpoints[0]  # Start with the most likely endpoint
+        # Use the correct Dr7.ai multimodal endpoint
+        api_url = "https://api.dr7.ai/v1/medical/multimodal/completions"
         headers = {
-            "Authorization": f"Bearer {settings.DR7_API_KEY}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {settings.DR7_API_KEY}"
         }
         
-        # Try different payload formats for different endpoints
-        if "image/analyze" in api_url:
-            # Dedicated image analysis endpoint format
-            payload = {
-                "model": "medsiglip-v1",
-                "image": base64_image,
-                "scan_type": scan_type,
-                "analysis_type": "comprehensive_medical_analysis"
-            }
-        elif "analyze" in api_url and "chat" not in api_url:
-            # General analysis endpoint format
-            payload = {
-                "model": "medsiglip-v1",
-                "input": {
-                    "type": "image",
-                    "data": base64_image
-                },
-                "parameters": {
-                    "scan_type": scan_type,
-                    "analysis_depth": "comprehensive"
+        # Create a temporary file for the image
+        import tempfile
+        import os
+        
+        # Determine file extension based on image type
+        file_extension = "jpg"  # Default
+        if image_bytes.startswith(b'\xff\xd8\xff'):
+            file_extension = "jpg"
+        elif image_bytes.startswith(b'\x89PNG'):
+            file_extension = "png"
+        elif image_bytes.startswith(b'GIF'):
+            file_extension = "gif"
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+            temp_file.write(image_bytes)
+            temp_file_path = temp_file.name
+        
+        try:
+            print(f"🔍 Using Dr7.ai multimodal endpoint: {api_url}")
+            
+            # Prepare form-data payload as per Dr7.ai API documentation
+            with open(temp_file_path, 'rb') as image_file:
+                files = {
+                    'image': (f'scan.{file_extension}', image_file, f'image/{file_extension}')
                 }
-            }
-        else:
-            # Chat completions format (fallback)
-            payload = {
-                "model": "medsiglip-v1",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": f"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, and recommendations. The image is provided as base64 data: {base64_image}. Please provide a comprehensive analysis including: 1) Key findings and abnormalities, 2) Clinical significance, 3) Risk assessment, 4) Specific recommendations for follow-up care."
-                    }
-                ],
-                "max_tokens": 2000,
-                "temperature": 0.3
-            }
+                
+                data = {
+                    'model': 'medgemma-4b-multimodal',
+                    'messages': f'[{{"role":"user","content":"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, and recommendations."}}]',
+                    'max_tokens': '2000'
+                }
+                
+                print(f"🔍 Sending request to Dr7.ai API...")
+                response = requests.post(
+                    api_url,
+                    headers=headers,
+                    files=files,
+                    data=data,
+                    timeout=120
+                )
+                
+                print(f"🔍 Response status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    api_response = response.json()
+                    print(f"✅ Dr7.ai API response received successfully")
+                    
+                    # Parse and structure the response
+                    analysis_result = parse_dr7_response(api_response, scan_type)
+                    return analysis_result
+                    
+                elif response.status_code == 402:
+                    print(f"❌ Insufficient API credits")
+                    raise Exception("Dr7.ai API credits insufficient. Please check your account balance.")
+                else:
+                    print(f"❌ API error: {response.status_code} - {response.text[:200]}")
+                    raise Exception(f"Dr7.ai API error: {response.status_code} - {response.text[:200]}")
+                    
+        except requests.exceptions.Timeout:
+            print(f"❌ Timeout error for Dr7.ai API")
+            raise Exception("Dr7.ai API request timed out")
+        except requests.exceptions.ConnectionError as e:
+            print(f"❌ Connection error for Dr7.ai API: {str(e)}")
+            raise Exception(f"Connection error to Dr7.ai API: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request error for Dr7.ai API: {str(e)}")
+            raise Exception(f"Request error to Dr7.ai API: {str(e)}")
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
         
         # Try multiple endpoints with retry mechanism
         last_error = None

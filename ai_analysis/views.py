@@ -167,7 +167,7 @@ def analyze_health_record(request):
         elif (file_url and is_imaging_record):
             # This is an MRI/CT/X-ray scan, use Dr7.ai API
             try:
-                from .ai_services import analyze_mri_ct_scan_with_dr7
+                from .ai_services import analyze_mri_ct_scan_with_dr7_new as analyze_mri_ct_scan_with_dr7
                 
                 # Download the image from the URL
                 image_response = requests.get(file_url)
@@ -351,7 +351,7 @@ def analyze_mri_ct_scan(request):
     try:
         from .serializers import MRI_CT_AnalysisRequestSerializer
         from .models import MRI_CT_Analysis
-        from .ai_services import analyze_mri_ct_scan_with_dr7, get_mri_ct_analysis_for_record
+        from .ai_services import analyze_mri_ct_scan_with_dr7_new as analyze_mri_ct_scan_with_dr7, get_mri_ct_analysis_for_record
         import requests
         
         # Validate request data
