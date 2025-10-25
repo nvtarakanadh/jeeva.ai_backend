@@ -196,3 +196,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # AI API Keys
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY')
+DR7_API_KEY = os.getenv('DR7_API_KEY')
