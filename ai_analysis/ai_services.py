@@ -1617,6 +1617,60 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
 # DR7.AI MRI/CT SCAN ANALYSIS SERVICES
 # =============================================================================
 
+def test_dr7_api_connectivity() -> bool:
+    """
+    Test Dr7.ai API connectivity with a simple request
+    
+    Returns:
+        bool: True if API is accessible, False otherwise
+    """
+    try:
+        if not hasattr(settings, 'DR7_API_KEY') or not settings.DR7_API_KEY:
+            print("❌ Dr7.ai API key not configured")
+            return False
+        
+        headers = {
+            "Authorization": f"Bearer {settings.DR7_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Test with a simple request to check connectivity
+        test_payload = {
+            "model": "medsiglip-v1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Hello, this is a connectivity test."
+                }
+            ],
+            "max_tokens": 10
+        }
+        
+        # Try the primary endpoint
+        response = requests.post(
+            "https://api.dr7.ai/v1/medical/chat/completions",
+            headers=headers,
+            json=test_payload,
+            timeout=30
+        )
+        
+        print(f"🔍 Dr7.ai API test response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            print("✅ Dr7.ai API is accessible")
+            return True
+        elif response.status_code == 402:
+            print("⚠️ Dr7.ai API accessible but insufficient credits")
+            return True  # API is working, just needs credits
+        else:
+            print(f"❌ Dr7.ai API test failed: {response.status_code} - {response.text[:200]}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Dr7.ai API test failed: {str(e)}")
+        return False
+
+
 def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> Dict:
     """
     Analyze MRI/CT scan using Dr7.ai API
@@ -1633,6 +1687,11 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
         if not hasattr(settings, 'DR7_API_KEY') or not settings.DR7_API_KEY:
             raise ValueError("Dr7.ai API key not configured")
         
+        # Test API connectivity first
+        print("🔍 Testing Dr7.ai API connectivity...")
+        if not test_dr7_api_connectivity():
+            print("⚠️ Dr7.ai API connectivity test failed, but proceeding with analysis attempt...")
+        
         # Convert image to base64 and optimize size if needed
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         
@@ -1644,13 +1703,12 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
         print(f"🔍 Image size: {image_size_mb:.2f}MB, Base64 size: {len(base64_image)} characters")
         
         # Try different endpoints for image analysis
-        # Based on testing, Dr7.ai API endpoints are not accessible
-        # Let's try a different approach - use Gemini for MRI/CT analysis as fallback
+        # Updated endpoints based on Dr7.ai API documentation
         possible_endpoints = [
+            "https://api.dr7.ai/v1/medical/chat/completions",
             "https://dr7.ai/api/v1/medical/chat/completions",
-            "https://api.dr7.ai/v1/medical/chat/completions", 
-            "https://dr7.ai/api/v1/analyze",
-            "https://api.dr7.ai/v1/analyze"
+            "https://api.dr7.ai/v1/analyze",
+            "https://dr7.ai/api/v1/analyze"
         ]
         
         api_url = possible_endpoints[0]  # Start with the most likely endpoint
@@ -1723,14 +1781,24 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
                     }
                 }
             else:
-                # For chat completions, try to include image data in a way that might work
-                # Some APIs support base64 images in the content field
+                # For chat completions, use proper multimodal format
                 payload = {
                     "model": "medsiglip-v1",
                     "messages": [
                         {
                             "role": "user",
-                            "content": f"Please analyze this {scan_type} scan image. The image data is: data:image/jpeg;base64,{base64_image}. Provide detailed medical findings, clinical significance, and recommendations."
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": f"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, and recommendations."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{base64_image}"
+                                    }
+                                }
+                            ]
                         }
                     ],
                     "max_tokens": 2000,
@@ -1740,7 +1808,14 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
             print(f"🔍 Payload size: {len(str(payload))} characters")
             
             try:
-                response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+                # Increase timeout for large images and add connection pooling
+                response = requests.post(
+                    api_url, 
+                    headers=headers, 
+                    json=payload, 
+                    timeout=120,  # Increased timeout
+                    stream=False  # Disable streaming to avoid premature response issues
+                )
                 print(f"🔍 Response status: {response.status_code}")
                 
                 if response.status_code == 200:
@@ -1771,8 +1846,17 @@ def analyze_mri_ct_scan_with_dr7(image_bytes: bytes, scan_type: str = "MRI") -> 
                 last_error = f"Connection error to Dr7.ai API: {str(e)}"
                 continue
             except requests.exceptions.RequestException as e:
-                print(f"❌ Request error for endpoint {api_url}: {str(e)}")
-                last_error = f"Request error to Dr7.ai API: {str(e)}"
+                error_msg = str(e)
+                if "Response ended prematurely" in error_msg:
+                    print(f"❌ Response ended prematurely for endpoint {api_url}")
+                    last_error = f"Response ended prematurely for {api_url}"
+                elif "Connection error" in error_msg:
+                    print(f"❌ Connection error for endpoint: {api_url}")
+                    print(f"❌ Connection error details: {error_msg}")
+                    last_error = f"Connection error to Dr7.ai API: {error_msg}"
+                else:
+                    print(f"❌ Request error for endpoint {api_url}: {error_msg}")
+                    last_error = f"Request error to Dr7.ai API: {error_msg}"
                 continue
         else:
             # If we get here, all endpoints failed
