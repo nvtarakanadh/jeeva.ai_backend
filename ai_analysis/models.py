@@ -44,6 +44,7 @@ class AIAnalysis(models.Model):
     recommendations = models.JSONField(default=list)
     confidence = models.FloatField(default=0.0)
     analysis_type = models.CharField(max_length=100, default='AI Analysis')
+    disclaimer = models.TextField(blank=True, null=True)
     processed_at = models.DateTimeField(default=timezone.now)
     record_title = models.CharField(max_length=255, blank=True)
     

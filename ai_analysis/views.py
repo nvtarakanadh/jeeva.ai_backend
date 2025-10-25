@@ -101,6 +101,7 @@ def analyze_prescription(request):
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+            disclaimer=analysis_result.get('aiDisclaimer', ''),
             record_title=health_record.title
         )
         
@@ -133,9 +134,11 @@ def analyze_health_record(request):
         if not serializer.is_valid():
             return cors_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
         
-        # Check if this is an image upload (has file_url)
-        if serializer.validated_data.get('file_url') and not serializer.validated_data.get('description'):
-            # This is an image upload, use image analysis
+        # Check if this is an image upload (has file_url) and is a prescription
+        if (serializer.validated_data.get('file_url') and 
+            not serializer.validated_data.get('description') and 
+            serializer.validated_data.get('record_type') == 'prescription'):
+            # This is a prescription image upload, use prescription analysis
             try:
                 # Download the image from the URL
                 image_response = requests.get(serializer.validated_data['file_url'])
@@ -150,7 +153,7 @@ def analyze_health_record(request):
                     status.HTTP_400_BAD_REQUEST
                 )
         else:
-            # This is text input, use text analysis
+            # This is text input or non-prescription record, use text analysis
             analysis_result = analyze_health_record_with_ai(serializer.validated_data)
         
         # Use the record ID from the frontend if provided, otherwise create a new one
@@ -187,6 +190,7 @@ def analyze_health_record(request):
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+            disclaimer=analysis_result.get('aiDisclaimer', ''),
             record_title=health_record.title
         )
         

@@ -10,3 +10,6 @@ requests==2.32.3
 dj-database-url==2.3.0
 psycopg[binary]==3.2.3
 whitenoise==6.8.2
+# PDF processing libraries (from original medical report analyzer)
+PyPDF2>=3.0.0
+pdfplumber>=0.9.0
