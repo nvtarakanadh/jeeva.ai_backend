@@ -16,16 +16,23 @@ class AIAnalysisSerializer(serializers.ModelSerializer):
         fields = '__all__'
     
     def to_representation(self, instance):
-        """Override to handle missing simplified_summary column gracefully"""
+        """Override to read simplified summary from disclaimer column"""
         data = super().to_representation(instance)
         
-        # Add simplifiedSummary field if it exists
-        try:
-            if hasattr(instance, 'simplified_summary'):
-                data['simplifiedSummary'] = instance.simplified_summary
-            else:
-                data['simplifiedSummary'] = ''
-        except Exception:
+        # Read simplified summary from disclaimer column
+        # If disclaimer contains simplified summary, use it; otherwise use empty string
+        disclaimer = data.get('disclaimer', '')
+        
+        # Check if disclaimer looks like a simplified summary (patient-friendly language)
+        if disclaimer and (
+            'simple terms' in disclaimer.lower() or 
+            'easy explanation' in disclaimer.lower() or
+            'what this means' in disclaimer.lower() or
+            'most important thing' in disclaimer.lower()
+        ):
+            data['simplifiedSummary'] = disclaimer
+            data['disclaimer'] = ''  # Clear disclaimer since it's being used for simplified summary
+        else:
             data['simplifiedSummary'] = ''
         
         return data

@@ -92,7 +92,14 @@ def analyze_prescription(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis
+        # Create AI analysis - store simplified summary in disclaimer column
+        disclaimer_content = analysis_result.get('aiDisclaimer', '')
+        simplified_summary = analysis_result.get('simplifiedSummary', '')
+        
+        # If we have simplified summary, store it in disclaimer column
+        if simplified_summary:
+            disclaimer_content = simplified_summary
+        
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
@@ -101,18 +108,9 @@ def analyze_prescription(request):
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=analysis_result.get('aiDisclaimer', ''),
+            disclaimer=disclaimer_content,  # Store simplified summary here
             record_title=health_record.title
         )
-        
-        # Add simplified_summary if the column exists
-        try:
-            if 'simplifiedSummary' in analysis_result:
-                ai_analysis.simplified_summary = analysis_result['simplifiedSummary']
-                ai_analysis.save()
-        except Exception as e:
-            print(f"⚠️ Could not save simplified_summary: {str(e)}")
-            # Continue without simplified_summary
         
         # Return the analysis result
         return cors_response({
@@ -250,7 +248,14 @@ def analyze_health_record(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis
+        # Create AI analysis - store simplified summary in disclaimer column
+        disclaimer_content = analysis_result.get('aiDisclaimer', '')
+        simplified_summary = analysis_result.get('simplifiedSummary', '')
+        
+        # If we have simplified summary, store it in disclaimer column
+        if simplified_summary:
+            disclaimer_content = simplified_summary
+        
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
@@ -259,18 +264,9 @@ def analyze_health_record(request):
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=analysis_result.get('aiDisclaimer', ''),
+            disclaimer=disclaimer_content,  # Store simplified summary here
             record_title=health_record.title
         )
-        
-        # Add simplified_summary if the column exists
-        try:
-            if 'simplifiedSummary' in analysis_result:
-                ai_analysis.simplified_summary = analysis_result['simplifiedSummary']
-                ai_analysis.save()
-        except Exception as e:
-            print(f"⚠️ Could not save simplified_summary: {str(e)}")
-            # Continue without simplified_summary
         
         # Return the analysis result
         return cors_response({
