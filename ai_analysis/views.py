@@ -92,19 +92,35 @@ def analyze_prescription(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis - use simplified_summary column
-        ai_analysis = AIAnalysis.objects.create(
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            simplified_summary=analysis_result.get('simplifiedSummary', ''),  # Use existing column
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=analysis_result.get('aiDisclaimer', ''),  # Keep original disclaimer
-            record_title=health_record.title
-        )
+        # Create AI analysis - handle simplified_summary column gracefully
+        try:
+            # Try to create with simplified_summary column
+            ai_analysis = AIAnalysis.objects.create(
+                record_id=record_id,
+                summary=analysis_result['summary'],
+                simplified_summary=analysis_result.get('simplifiedSummary', ''),
+                key_findings=analysis_result['keyFindings'],
+                risk_warnings=analysis_result['riskWarnings'],
+                recommendations=analysis_result['recommendations'],
+                confidence=analysis_result['confidence'],
+                analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+                disclaimer=analysis_result.get('aiDisclaimer', ''),
+                record_title=health_record.title
+            )
+        except Exception as e:
+            # If simplified_summary column doesn't exist, create without it
+            print(f"⚠️ simplified_summary column not available, creating without it: {str(e)}")
+            ai_analysis = AIAnalysis.objects.create(
+                record_id=record_id,
+                summary=analysis_result['summary'],
+                key_findings=analysis_result['keyFindings'],
+                risk_warnings=analysis_result['riskWarnings'],
+                recommendations=analysis_result['recommendations'],
+                confidence=analysis_result['confidence'],
+                analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+                disclaimer=analysis_result.get('aiDisclaimer', ''),
+                record_title=health_record.title
+            )
         
         # Return the analysis result
         return cors_response({
@@ -242,19 +258,35 @@ def analyze_health_record(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis - use simplified_summary column
-        ai_analysis = AIAnalysis.objects.create(
-            record_id=record_id,
-            summary=analysis_result['summary'],
-            simplified_summary=analysis_result.get('simplifiedSummary', ''),  # Use existing column
-            key_findings=analysis_result['keyFindings'],
-            risk_warnings=analysis_result['riskWarnings'],
-            recommendations=analysis_result['recommendations'],
-            confidence=analysis_result['confidence'],
-            analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=analysis_result.get('aiDisclaimer', ''),  # Keep original disclaimer
-            record_title=health_record.title
-        )
+        # Create AI analysis - handle simplified_summary column gracefully
+        try:
+            # Try to create with simplified_summary column
+            ai_analysis = AIAnalysis.objects.create(
+                record_id=record_id,
+                summary=analysis_result['summary'],
+                simplified_summary=analysis_result.get('simplifiedSummary', ''),
+                key_findings=analysis_result['keyFindings'],
+                risk_warnings=analysis_result['riskWarnings'],
+                recommendations=analysis_result['recommendations'],
+                confidence=analysis_result['confidence'],
+                analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+                disclaimer=analysis_result.get('aiDisclaimer', ''),
+                record_title=health_record.title
+            )
+        except Exception as e:
+            # If simplified_summary column doesn't exist, create without it
+            print(f"⚠️ simplified_summary column not available, creating without it: {str(e)}")
+            ai_analysis = AIAnalysis.objects.create(
+                record_id=record_id,
+                summary=analysis_result['summary'],
+                key_findings=analysis_result['keyFindings'],
+                risk_warnings=analysis_result['riskWarnings'],
+                recommendations=analysis_result['recommendations'],
+                confidence=analysis_result['confidence'],
+                analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
+                disclaimer=analysis_result.get('aiDisclaimer', ''),
+                record_title=health_record.title
+            )
         
         # Return the analysis result
         return cors_response({
