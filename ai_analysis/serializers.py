@@ -10,11 +10,25 @@ class HealthRecordSerializer(serializers.ModelSerializer):
 
 class AIAnalysisSerializer(serializers.ModelSerializer):
     ai_disclaimer = serializers.CharField(source='disclaimer', read_only=True)
-    simplifiedSummary = serializers.CharField(source='simplified_summary', read_only=True)
     
     class Meta:
         model = AIAnalysis
         fields = '__all__'
+    
+    def to_representation(self, instance):
+        """Override to handle missing simplified_summary column gracefully"""
+        data = super().to_representation(instance)
+        
+        # Add simplifiedSummary field if it exists
+        try:
+            if hasattr(instance, 'simplified_summary'):
+                data['simplifiedSummary'] = instance.simplified_summary
+            else:
+                data['simplifiedSummary'] = ''
+        except Exception:
+            data['simplifiedSummary'] = ''
+        
+        return data
 
 
 class PrescriptionAnalysisRequestSerializer(serializers.Serializer):

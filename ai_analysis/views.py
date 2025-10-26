@@ -96,7 +96,6 @@ def analyze_prescription(request):
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
-            simplified_summary=analysis_result.get('simplifiedSummary', ''),
             key_findings=analysis_result['keyFindings'],
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
@@ -105,6 +104,15 @@ def analyze_prescription(request):
             disclaimer=analysis_result.get('aiDisclaimer', ''),
             record_title=health_record.title
         )
+        
+        # Add simplified_summary if the column exists
+        try:
+            if 'simplifiedSummary' in analysis_result:
+                ai_analysis.simplified_summary = analysis_result['simplifiedSummary']
+                ai_analysis.save()
+        except Exception as e:
+            print(f"⚠️ Could not save simplified_summary: {str(e)}")
+            # Continue without simplified_summary
         
         # Return the analysis result
         return cors_response({
@@ -246,7 +254,6 @@ def analyze_health_record(request):
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
-            simplified_summary=analysis_result.get('simplifiedSummary', ''),
             key_findings=analysis_result['keyFindings'],
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
@@ -255,6 +262,15 @@ def analyze_health_record(request):
             disclaimer=analysis_result.get('aiDisclaimer', ''),
             record_title=health_record.title
         )
+        
+        # Add simplified_summary if the column exists
+        try:
+            if 'simplifiedSummary' in analysis_result:
+                ai_analysis.simplified_summary = analysis_result['simplifiedSummary']
+                ai_analysis.save()
+        except Exception as e:
+            print(f"⚠️ Could not save simplified_summary: {str(e)}")
+            # Continue without simplified_summary
         
         # Return the analysis result
         return cors_response({
