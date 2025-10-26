@@ -541,7 +541,9 @@ def generate_comprehensive_lab_analysis(model, text: str, title: str) -> Dict:
 
         1. **Summary** (exactly 100 words): Start with "This analysis is for [age]-year-old [gender], [name]." Include specific findings, health risk assessment, and immediate priorities. End with the disclaimer.
 
-        2. **Recommendations** (specific, actionable): List 8-12 specific recommendations with categories like:
+        2. **Simplified Summary** (patient-friendly): Provide a clear, easy-to-understand explanation of the lab results in simple language that patients can understand. Avoid complex medical jargon and explain what the results mean for their health in everyday terms.
+
+        3. **Recommendations** (specific, actionable): List 8-12 specific recommendations with categories like:
            - Immediate consultation with specialists
            - Public health measures
            - Follow-up tests with specific rationale
@@ -553,6 +555,7 @@ def generate_comprehensive_lab_analysis(model, text: str, title: str) -> Dict:
         Return the response in this EXACT JSON format:
         {{
             "summary": "This analysis is for a [age]-year-old [gender], [name]. [Detailed 100-word analysis with specific findings, risk assessment, and disclaimer]",
+            "simplifiedSummary": "In simple terms, your lab results show [easy explanation]. This means [what it means for your health]. The most important thing to know is [key takeaway for patient].",
             "recommendations": [
                 "Seek immediate consultation with [specialist type] for [specific reason]",
                 "Follow public health guidance: [specific measures]",
@@ -580,14 +583,45 @@ def generate_comprehensive_lab_analysis(model, text: str, title: str) -> Dict:
         # Parse the JSON response
         try:
             result = json.loads(response.text)
+            print(f"✅ Successfully parsed JSON response")
+            print(f"🔍 Simplified summary in JSON: {result.get('simplifiedSummary', 'NOT FOUND')}")
             return result
         except json.JSONDecodeError:
             # If JSON parsing fails, try to extract the content manually
             text_content = response.text
+            print(f"⚠️ JSON parsing failed, trying manual extraction")
+            print(f"🔍 Response text length: {len(text_content)} characters")
+            print(f"🔍 Response preview: {text_content[:500]}...")
             
             # Extract summary (look for the 100-word analysis)
             summary_match = re.search(r'"summary":\s*"([^"]+)"', text_content)
             summary = summary_match.group(1) if summary_match else "Comprehensive medical report analysis completed. AI-powered clinical review identified key findings requiring healthcare provider consultation for optimal health management and follow-up care."
+            
+            # Extract simplified summary
+            simplified_summary_match = re.search(r'"simplifiedSummary":\s*"([^"]+)"', text_content)
+            simplified_summary = simplified_summary_match.group(1) if simplified_summary_match else ""
+            
+            # If no JSON match, try to extract from text format
+            if not simplified_summary:
+                print(f"🔍 No JSON simplified summary found, trying text extraction")
+                # Look for "Simplified Summary" section in the text
+                simplified_match = re.search(r'(?i)simplified summary[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)', text_content)
+                if simplified_match:
+                    simplified_summary = simplified_match.group(1).strip()
+                    print(f"✅ Found simplified summary in text: {simplified_summary[:100]}...")
+                else:
+                    # Try alternative patterns
+                    simplified_match = re.search(r'(?i)in simple terms[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)', text_content)
+                    if simplified_match:
+                        simplified_summary = simplified_match.group(1).strip()
+                        print(f"✅ Found simplified summary with alternative pattern: {simplified_summary[:100]}...")
+                    else:
+                        print(f"❌ No simplified summary found in text")
+            
+            # If still no simplified summary found, use fallback
+            if not simplified_summary:
+                simplified_summary = "Your lab results have been analyzed. Please consult with your healthcare provider to understand what these results mean for your health and any next steps you should take."
+                print(f"⚠️ Using fallback simplified summary")
             
             # Extract recommendations
             recommendations = []
@@ -609,8 +643,10 @@ def generate_comprehensive_lab_analysis(model, text: str, title: str) -> Dict:
                     "Follow-up Tests: HIV Test: To check for co-infection status"
                 ]
             
+            print(f"🔍 Final simplified summary: {simplified_summary[:100]}...")
             return {
                 "summary": summary,
+                "simplifiedSummary": simplified_summary,
                 "keyFindings": [
                     "Comprehensive lab analysis completed with clinical significance assessment",
                     "Test results evaluated for health implications",
@@ -1473,12 +1509,22 @@ def create_fallback_diagnosis() -> Dict:
 
 
 def analyze_health_record_with_ai(record_data: Dict) -> Dict:
-    """Analyze health record using AI services (adapted for text input)"""
+    """Analyze health record using AI services (Dr7.ai primary, Gemini fallback)"""
     try:
         record_type = record_data.get('record_type', 'unknown')
         title = record_data.get('title', 'Health Record')
         description = record_data.get('description', '')
         
+        # Try Dr7.ai first for all record types
+        if hasattr(settings, 'DR7_API_KEY') and settings.DR7_API_KEY:
+            try:
+                print(f"🔍 Attempting Dr7.ai analysis for {record_type}")
+                return analyze_text_with_dr7(description, record_type)
+            except Exception as dr7_error:
+                print(f"❌ Dr7.ai analysis failed: {str(dr7_error)}")
+                print(f"🔄 Falling back to Gemini for {record_type} analysis")
+        
+        # Fallback to Gemini if Dr7.ai fails or is not configured
         if record_type == 'prescription':
             # For prescription records, use the original model approach
             # Since we don't have image bytes, we'll simulate the medicine extraction
@@ -1634,7 +1680,7 @@ def test_dr7_api_connectivity() -> bool:
             "Content-Type": "application/json"
         }
         
-        # Test with a simple request to check connectivity
+        # Test with a simple request to check connectivity using correct endpoint
         test_payload = {
             "model": "medsiglip-v1",
             "messages": [
@@ -1643,12 +1689,13 @@ def test_dr7_api_connectivity() -> bool:
                     "content": "Hello, this is a connectivity test."
                 }
             ],
-            "max_tokens": 10
+            "max_tokens": 10,
+            "temperature": 0.7
         }
         
-        # Try the primary endpoint
+        # Use the correct Dr7.ai endpoint from documentation
         response = requests.post(
-            "https://api.dr7.ai/v1/medical/chat/completions",
+            "https://dr7.ai/api/v1/medical/chat/completions",
             headers=headers,
             json=test_payload,
             timeout=30
@@ -1673,7 +1720,7 @@ def test_dr7_api_connectivity() -> bool:
 
 def analyze_mri_ct_scan_with_dr7_new(image_bytes: bytes, scan_type: str = "MRI") -> Dict:
     """
-    Analyze MRI/CT scan using Dr7.ai API with correct multimodal endpoint
+    Analyze MRI/CT scan using Dr7.ai API with medsiglip-v1 model for image analysis
     
     Args:
         image_bytes: The image file bytes
@@ -1692,205 +1739,78 @@ def analyze_mri_ct_scan_with_dr7_new(image_bytes: bytes, scan_type: str = "MRI")
         if image_size_mb > 10:  # If image is larger than 10MB
             print(f"⚠️ Warning: Large image detected ({image_size_mb:.2f}MB). This might cause timeout issues.")
         
+        print(f"🔍 Starting {scan_type} scan analysis with Dr7.ai medsiglip-v1...")
         print(f"🔍 Image size: {image_size_mb:.2f}MB")
         
-        # Use the correct Dr7.ai multimodal endpoint
-        api_url = "https://api.dr7.ai/v1/medical/multimodal/completions"
+        # Use the correct Dr7.ai chat completions endpoint
+        api_url = "https://dr7.ai/api/v1/medical/chat/completions"
         headers = {
-            "Authorization": f"Bearer {settings.DR7_API_KEY}"
+            "Authorization": f"Bearer {settings.DR7_API_KEY}",
+            "Content-Type": "application/json"
         }
         
-        # Create a temporary file for the image
-        import tempfile
-        import os
+        # Convert image to base64 for Dr7.ai API
+        import base64
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
         
-        # Determine file extension based on image type
-        file_extension = "jpg"  # Default
-        if image_bytes.startswith(b'\xff\xd8\xff'):
-            file_extension = "jpg"
-        elif image_bytes.startswith(b'\x89PNG'):
-            file_extension = "png"
-        elif image_bytes.startswith(b'GIF'):
-            file_extension = "gif"
-        
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
-            temp_file.write(image_bytes)
-            temp_file_path = temp_file.name
-        
-        try:
-            print(f"🔍 Using Dr7.ai multimodal endpoint: {api_url}")
-            
-            # Prepare form-data payload as per Dr7.ai API documentation
-            with open(temp_file_path, 'rb') as image_file:
-                files = {
-                    'image': (f'scan.{file_extension}', image_file, f'image/{file_extension}')
-                }
-                
-                data = {
-                    'model': 'medgemma-4b-multimodal',
-                    'messages': f'[{{"role":"user","content":"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, and recommendations."}}]',
-                    'max_tokens': '2000'
-                }
-                
-                print(f"🔍 Sending request to Dr7.ai API...")
-                response = requests.post(
-                    api_url,
-                    headers=headers,
-                    files=files,
-                    data=data,
-                    timeout=120
-                )
-                
-                print(f"🔍 Response status: {response.status_code}")
-                
-                if response.status_code == 200:
-                    api_response = response.json()
-                    print(f"✅ Dr7.ai API response received successfully")
-                    
-                    # Parse and structure the response
-                    analysis_result = parse_dr7_response(api_response, scan_type)
-                    return analysis_result
-                    
-                elif response.status_code == 402:
-                    print(f"❌ Insufficient API credits")
-                    raise Exception("Dr7.ai API credits insufficient. Please check your account balance.")
-                else:
-                    print(f"❌ API error: {response.status_code} - {response.text[:200]}")
-                    raise Exception(f"Dr7.ai API error: {response.status_code} - {response.text[:200]}")
-                    
-        except requests.exceptions.Timeout:
-            print(f"❌ Timeout error for Dr7.ai API")
-            raise Exception("Dr7.ai API request timed out")
-        except requests.exceptions.ConnectionError as e:
-            print(f"❌ Connection error for Dr7.ai API: {str(e)}")
-            raise Exception(f"Connection error to Dr7.ai API: {str(e)}")
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Request error for Dr7.ai API: {str(e)}")
-            raise Exception(f"Request error to Dr7.ai API: {str(e)}")
-        finally:
-            # Clean up temporary file
-            try:
-                os.unlink(temp_file_path)
-            except:
-                pass
-        
-        # Try multiple endpoints with retry mechanism
-        last_error = None
-        
-        for i, endpoint in enumerate(possible_endpoints):
-            api_url = endpoint
-            print(f"🔍 Trying endpoint {i+1}/{len(possible_endpoints)}: {api_url}")
-            
-            # Update payload format based on endpoint
-            if "image/analyze" in api_url:
-                payload = {
-                    "model": "medsiglip-v1",
-                    "image": base64_image,
-                    "scan_type": scan_type,
-                    "analysis_type": "comprehensive_medical_analysis"
-                }
-            elif "analyze" in api_url and "chat" not in api_url:
-                payload = {
-                    "model": "medsiglip-v1",
-                    "input": {
-                        "type": "image",
-                        "data": base64_image
-                    },
-                    "parameters": {
-                        "scan_type": scan_type,
-                        "analysis_depth": "comprehensive"
-                    }
-                }
-            else:
-                # For chat completions, use proper multimodal format
-                payload = {
-                    "model": "medsiglip-v1",
-                    "messages": [
+        # Use medsiglip-v1 model for image analysis (as per API models list)
+        payload = {
+            "model": "medsiglip-v1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
                         {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": f"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, and recommendations."
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{base64_image}"
-                                    }
-                                }
-                            ]
+                            "type": "text",
+                            "text": f"Please analyze this {scan_type} scan image and provide detailed medical findings, clinical significance, simplified summary (patient-friendly explanation), and recommendations. Structure your response with clear sections for findings, clinical significance, simplified summary, and recommendations."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
                         }
-                    ],
-                    "max_tokens": 2000,
-                    "temperature": 0.3
+                    ]
                 }
+            ],
+            "max_tokens": 2000,
+            "temperature": 0.7
+        }
+        
+        print(f"🔍 Using Dr7.ai medsiglip-v1 for {scan_type} image analysis")
+        
+        response = requests.post(
+            api_url,
+            headers=headers,
+            json=payload,
+            timeout=120
+        )
+        
+        print(f"🔍 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            api_response = response.json()
+            print(f"✅ Dr7.ai medsiglip-v1 analysis completed successfully")
             
-            print(f"🔍 Payload size: {len(str(payload))} characters")
+            # Parse and structure the response
+            analysis_result = parse_dr7_response(api_response, scan_type)
+            return analysis_result
             
-            try:
-                # Increase timeout for large images and add connection pooling
-                response = requests.post(
-                    api_url, 
-                    headers=headers, 
-                    json=payload, 
-                    timeout=120,  # Increased timeout
-                    stream=False  # Disable streaming to avoid premature response issues
-                )
-                print(f"🔍 Response status: {response.status_code}")
-                
-                if response.status_code == 200:
-                    api_response = response.json()
-                    print(f"✅ Dr7.ai API response received from {api_url}")
-                    break
-                elif response.status_code == 402:
-                    print(f"❌ Insufficient API credits: {api_url}")
-                    last_error = "Dr7.ai API credits insufficient. Please check your account balance."
-                    # Don't continue trying other endpoints if it's a credit issue
-                    break
-                elif response.status_code == 404:
-                    print(f"❌ Endpoint not found: {api_url}")
-                    last_error = f"Endpoint not found: {api_url}"
-                    continue
-                else:
-                    print(f"❌ API Error Response: {response.text}")
-                    last_error = f"Dr7.ai API error: {response.status_code} - {response.text}"
-                    continue
-                    
-            except requests.exceptions.Timeout:
-                print(f"❌ Timeout for endpoint: {api_url}")
-                last_error = "Dr7.ai API request timed out"
-                continue
-            except requests.exceptions.ConnectionError as e:
-                print(f"❌ Connection error for endpoint: {api_url}")
-                print(f"❌ Connection error details: {str(e)}")
-                last_error = f"Connection error to Dr7.ai API: {str(e)}"
-                continue
-            except requests.exceptions.RequestException as e:
-                error_msg = str(e)
-                if "Response ended prematurely" in error_msg:
-                    print(f"❌ Response ended prematurely for endpoint {api_url}")
-                    last_error = f"Response ended prematurely for {api_url}"
-                elif "Connection error" in error_msg:
-                    print(f"❌ Connection error for endpoint: {api_url}")
-                    print(f"❌ Connection error details: {error_msg}")
-                    last_error = f"Connection error to Dr7.ai API: {error_msg}"
-                else:
-                    print(f"❌ Request error for endpoint {api_url}: {error_msg}")
-                    last_error = f"Request error to Dr7.ai API: {error_msg}"
-                continue
+        elif response.status_code == 402:
+            print(f"❌ Insufficient API credits")
+            raise Exception("Dr7.ai API credits insufficient. Please check your account balance.")
+        elif response.status_code == 401:
+            print(f"❌ Invalid API key")
+            raise Exception("Dr7.ai API key is invalid. Please check your API key.")
+        elif response.status_code == 429:
+            print(f"❌ Rate limit exceeded")
+            raise Exception("Dr7.ai API rate limit exceeded. Please try again later.")
         else:
-            # If we get here, all endpoints failed
-            raise Exception(f"All Dr7.ai API endpoints failed. Last error: {last_error}")
-        
-        # Parse and structure the response
-        analysis_result = parse_dr7_response(api_response, scan_type)
-        
-        return analysis_result
-        
+            print(f"❌ API error: {response.status_code} - {response.text[:200]}")
+            raise Exception(f"Dr7.ai API error: {response.status_code} - {response.text[:200]}")
+            
     except Exception as e:
-        print(f"❌ Error in Dr7.ai analysis: {str(e)}")
+        print(f"❌ Error in Dr7.ai medsiglip-v1 analysis: {str(e)}")
         
         # Try using Gemini as a fallback for MRI/CT analysis
         print(f"🔄 Dr7.ai failed, trying Gemini for {scan_type} analysis")
@@ -1901,6 +1821,144 @@ def analyze_mri_ct_scan_with_dr7_new(image_bytes: bytes, scan_type: str = "MRI")
             # Provide a fallback response instead of failing completely
             print(f"🔄 Providing fallback analysis for {scan_type} scan")
             return create_fallback_mri_ct_response(scan_type, str(e))
+
+
+def analyze_text_with_dr7(text_content: str, record_type: str = "health_record") -> Dict:
+    """
+    Analyze text content using Dr7.ai API for medical text analysis
+    
+    Args:
+        text_content: The text content to analyze
+        record_type: Type of record (prescription, lab_report, health_record, etc.)
+    
+    Returns:
+        Dict containing analysis results
+    """
+    try:
+        # Check if Dr7.ai API key is configured
+        if not hasattr(settings, 'DR7_API_KEY') or not settings.DR7_API_KEY:
+            raise ValueError("Dr7.ai API key not configured")
+        
+        # Use the correct Dr7.ai chat completions endpoint
+        api_url = "https://dr7.ai/api/v1/medical/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.DR7_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Create appropriate prompt based on record type
+        if record_type == "prescription":
+            prompt = f"""Please analyze this prescription text and provide:
+1. Medicine names and dosages
+2. Potential drug interactions
+3. Side effects to watch for
+4. Recommendations for patient
+
+Prescription text: {text_content}"""
+        elif record_type == "lab_report":
+            prompt = f"""Please analyze this lab report and provide:
+1. Key findings and values
+2. Abnormal values and their significance
+3. Clinical implications
+4. Simplified Summary (patient-friendly explanation in simple language)
+5. Recommendations for follow-up
+
+Lab report text: {text_content}"""
+        else:
+            prompt = f"""Please analyze this medical record and provide:
+1. Key findings and observations
+2. Clinical significance
+3. Risk assessment
+4. Recommendations for patient care
+
+Medical record text: {text_content}"""
+        
+        # Prepare the request payload
+        payload = {
+            "model": "medsiglip-v1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": 1500,
+            "temperature": 0.7
+        }
+        
+        print(f"🔍 Using Dr7.ai for {record_type} text analysis")
+        
+        response = requests.post(
+            api_url,
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        print(f"🔍 Response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            api_response = response.json()
+            print(f"✅ Dr7.ai text analysis completed successfully")
+            
+            # Extract content from response
+            choices = api_response.get('choices', [])
+            if choices:
+                raw_content = choices[0].get('message', {}).get('content', '')
+                
+                # Parse the response to extract simplified summary
+                simplified_summary = ""
+                
+                # Try to extract simplified summary from the response
+                if "simplified summary" in raw_content.lower() or "simplified summary:" in raw_content.lower():
+                    # Look for simplified summary section
+                    simplified_match = re.search(r'(?i)simplified summary[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)', raw_content)
+                    if simplified_match:
+                        simplified_summary = simplified_match.group(1).strip()
+                    else:
+                        # Try alternative patterns
+                        simplified_match = re.search(r'(?i)in simple terms[:\s]*([^\n]+(?:\n(?!\n)[^\n]+)*)', raw_content)
+                        if simplified_match:
+                            simplified_summary = simplified_match.group(1).strip()
+                
+                # If no simplified summary found, use fallback
+                if not simplified_summary:
+                    simplified_summary = "Your medical report has been analyzed. Please consult with your healthcare provider to understand what these results mean for your health and any next steps you should take."
+                
+                # Parse the response into structured format
+                analysis_result = {
+                    "summary": raw_content,
+                    "simplifiedSummary": simplified_summary,
+                    "keyFindings": [raw_content],  # For compatibility with existing code
+                    "riskWarnings": [],
+                    "recommendations": [],
+                    "confidence": 0.85,
+                    "analysisType": f"AI {record_type.title()} Analysis",
+                    "aiDisclaimer": "This analysis is provided by medical AI and should be reviewed by qualified healthcare professionals.",
+                    "source_model": "medsiglip-v1",
+                    "api_usage_tokens": api_response.get('usage', {}).get('total_tokens', 0)
+                }
+                
+                return analysis_result
+            else:
+                raise ValueError("No analysis content received from Dr7.ai API")
+                
+        elif response.status_code == 402:
+            print(f"❌ Insufficient API credits")
+            raise Exception("Dr7.ai API credits insufficient. Please check your account balance.")
+        elif response.status_code == 401:
+            print(f"❌ Invalid API key")
+            raise Exception("Dr7.ai API key is invalid. Please check your API key.")
+        elif response.status_code == 429:
+            print(f"❌ Rate limit exceeded")
+            raise Exception("Dr7.ai API rate limit exceeded. Please try again later.")
+        else:
+            print(f"❌ API error: {response.status_code} - {response.text[:200]}")
+            raise Exception(f"Dr7.ai API error: {response.status_code} - {response.text[:200]}")
+        
+    except Exception as e:
+        print(f"❌ Error in Dr7.ai text analysis: {str(e)}")
+        raise Exception(f"Dr7.ai text analysis failed: {str(e)}")
 
 
 def analyze_mri_ct_with_gemini(image_bytes: bytes, scan_type: str) -> Dict:
@@ -1948,6 +2006,11 @@ def analyze_mri_ct_with_gemini(image_bytes: bytes, scan_type: str) -> Dict:
         **Risk Assessment:**
         - Provide risk level: low, moderate, or high
         - Explain the reasoning behind the risk assessment
+        
+        **Simplified Summary:**
+        - Provide a clear, easy-to-understand explanation in simple language
+        - Avoid complex medical jargon
+        - Explain what the scan results mean for the patient's health in everyday terms
         
         **Recommendations:**
         - List specific follow-up actions with bullet points
@@ -2002,6 +2065,7 @@ def parse_gemini_mri_response(analysis_text: str, scan_type: str) -> Dict:
     
     # Initialize default values
     summary = ""
+    simplified_summary = ""
     findings = []
     region = "Multiple regions analyzed"
     clinical_significance = ""
@@ -2047,6 +2111,9 @@ def parse_gemini_mri_response(analysis_text: str, scan_type: str) -> Dict:
                         point = point.strip()
                         if len(point) > 15:
                             recommendations.append(point)
+                
+                elif "simplified summary" in header:
+                    simplified_summary = content
                 
                 elif "summary" in header:
                     summary = content
@@ -2123,6 +2190,7 @@ def parse_gemini_mri_response(analysis_text: str, scan_type: str) -> Dict:
     
     return {
         "summary": summary,
+        "simplifiedSummary": simplified_summary if simplified_summary else "Your scan has been analyzed. Please consult with your healthcare provider to understand what these results mean for your health and any next steps you should take.",
         "findings": findings,
         "region": region,
         "clinical_significance": clinical_significance,
@@ -2244,25 +2312,62 @@ def parse_dr7_response(api_response: Dict, scan_type: str) -> Dict:
         # Determine risk level based on findings
         risk_level = determine_risk_level(findings, raw_clinical)
         
+        # Get usage information if available
+        usage = api_response.get('usage', {})
+        api_usage_tokens = usage.get('total_tokens', 0)
+        
         # Create structured response
         result = {
             "summary": summary,
+            "simplifiedSummary": "Your scan has been analyzed. Please consult with your healthcare provider to understand what these results mean for your health and any next steps you should take.",
             "findings": findings,
             "region": raw_region,
             "clinical_significance": raw_clinical,
             "recommendations": recommendations,
             "risk_level": risk_level,
-            "source_model": "medsiglip-v1",
+            "source_model": "medsiglip-v1",  # Updated to reflect correct model
             "scan_type": scan_type,
-            "api_usage_tokens": api_response.get('usage', {}).get('total_tokens', 0)
+            "api_usage_tokens": api_usage_tokens,
+            "raw_response": raw_content  # Keep raw response for debugging
         }
+        
+        print(f"✅ Successfully parsed Dr7.ai response")
+        print(f"🔍 Summary length: {len(summary)} characters")
+        print(f"🔍 Findings count: {len(findings)}")
+        print(f"🔍 Recommendations count: {len(recommendations)}")
+        print(f"🔍 Risk level: {risk_level}")
         
         return result
         
     except Exception as e:
         print(f"❌ Error parsing Dr7.ai response: {str(e)}")
-        # Return fallback response
-        return create_fallback_mri_ct_response(scan_type)
+        print(f"🔍 Raw API response: {api_response}")
+        
+        # Return a fallback response with the raw content
+        raw_content = ""
+        try:
+            choices = api_response.get('choices', [])
+            if choices:
+                raw_content = choices[0].get('message', {}).get('content', '')
+        except:
+            pass
+            
+        return {
+            "summary": f"AI analysis completed for {scan_type} scan. Raw analysis: {raw_content[:500]}..." if raw_content else f"AI analysis completed for {scan_type} scan.",
+            "findings": [f"Analysis completed using AI medsiglip-v1 model"],
+            "region": "Multiple regions analyzed",
+            "clinical_significance": "Analysis completed with AI assistance",
+            "recommendations": [
+                "Consult with a qualified radiologist for detailed interpretation",
+                "Follow up with your healthcare provider for clinical correlation",
+                "Consider additional imaging if clinically indicated"
+            ],
+            "risk_level": "moderate",
+            "source_model": "medsiglip-v1",
+            "scan_type": scan_type,
+            "api_usage_tokens": 0,
+            "raw_response": str(api_response)
+        }
 
 
 def ensure_minimum_summary_length(summary: str, findings: List, clinical: str, scan_type: str) -> str:
@@ -2437,6 +2542,11 @@ def create_fallback_mri_ct_response(scan_type: str, error_message: str = None) -
             f"Please consult with your healthcare provider for proper interpretation of the imaging findings. "
             f"Automated analysis tools are designed to assist medical professionals but should not replace "
             f"clinical judgment and professional interpretation of medical imaging studies."
+        ),
+        "simplifiedSummary": (
+            f"Your {scan_type} scan has been received but couldn't be automatically analyzed due to technical issues. "
+            f"This doesn't mean there's anything wrong with your scan - it just means a human radiologist needs to review it. "
+            f"Please schedule an appointment with your doctor to discuss the results and any next steps."
         ),
         "findings": [
             "Scan received and requires manual radiologist review",

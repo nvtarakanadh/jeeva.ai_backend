@@ -10,6 +10,7 @@ class HealthRecordSerializer(serializers.ModelSerializer):
 
 class AIAnalysisSerializer(serializers.ModelSerializer):
     ai_disclaimer = serializers.CharField(source='disclaimer', read_only=True)
+    simplifiedSummary = serializers.CharField(source='simplified_summary', read_only=True)
     
     class Meta:
         model = AIAnalysis
