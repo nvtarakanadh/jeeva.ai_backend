@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
 """
-Script to apply the simplified_summary migration to Render PostgreSQL database
-Run this script to add the missing column to your production database
+Script to apply migration to Render PostgreSQL database
+Run this locally to add the simplified_summary column to your production database
 """
 
 import os
 import sys
-import django
-from django.db import connection
+import psycopg2
+from urllib.parse import urlparse
 
-# Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'jeeva_ai_backend.settings')
-django.setup()
+# Your Render PostgreSQL connection string
+DATABASE_URL = "postgresql://jeeva_user:8ZPRmehSIzBJLwctTd6s66oEz6ZVqLjb@dpg-d3suic1r0fns738ppog0-a.oregon-postgres.render.com/jeeva_db"
 
-def apply_migration():
-    """Apply the simplified_summary migration manually to Render PostgreSQL"""
-    print("🔄 Applying simplified_summary migration to Render PostgreSQL database...")
+def apply_migration_to_render():
+    """Apply the simplified_summary migration to Render PostgreSQL database"""
+    print("🔄 Connecting to Render PostgreSQL database...")
     
     try:
-        with connection.cursor() as cursor:
-            # Check if column already exists (PostgreSQL syntax)
+        # Parse the database URL
+        parsed_url = urlparse(DATABASE_URL)
+        
+        # Connect to the database
+        conn = psycopg2.connect(
+            host=parsed_url.hostname,
+            port=parsed_url.port,
+            database=parsed_url.path[1:],  # Remove leading slash
+            user=parsed_url.username,
+            password=parsed_url.password
+        )
+        
+        print("✅ Connected to Render PostgreSQL database!")
+        
+        with conn.cursor() as cursor:
+            # Check if column already exists
             cursor.execute("""
                 SELECT COUNT(*) 
                 FROM information_schema.columns 
@@ -39,6 +52,9 @@ def apply_migration():
                 ALTER TABLE ai_insights 
                 ADD COLUMN simplified_summary TEXT
             """)
+            
+            # Commit the changes
+            conn.commit()
             
             print("✅ Successfully added simplified_summary column!")
             
@@ -60,12 +76,20 @@ def apply_migration():
         print(f"❌ Error applying migration: {str(e)}")
         print(f"🔍 Error type: {type(e).__name__}")
         return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
+            print("🔌 Database connection closed.")
 
 if __name__ == "__main__":
-    success = apply_migration()
+    print("🚀 Applying migration to Render PostgreSQL database...")
+    print(f"🔗 Database: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'Render PostgreSQL'}")
+    
+    success = apply_migration_to_render()
     if success:
         print("\n🎉 Migration applied successfully!")
         print("🚀 AI Analysis should now work with Simplified Summary!")
+        print("📱 Test by uploading a health record on your deployed app!")
     else:
         print("\n💥 Migration failed!")
         sys.exit(1)
