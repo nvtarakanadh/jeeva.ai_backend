@@ -10,32 +10,11 @@ class HealthRecordSerializer(serializers.ModelSerializer):
 
 class AIAnalysisSerializer(serializers.ModelSerializer):
     ai_disclaimer = serializers.CharField(source='disclaimer', read_only=True)
+    simplifiedSummary = serializers.CharField(source='simplified_summary', read_only=True)
     
     class Meta:
         model = AIAnalysis
         fields = '__all__'
-    
-    def to_representation(self, instance):
-        """Override to read simplified summary from disclaimer column"""
-        data = super().to_representation(instance)
-        
-        # Read simplified summary from disclaimer column
-        # If disclaimer contains simplified summary, use it; otherwise use empty string
-        disclaimer = data.get('disclaimer', '')
-        
-        # Check if disclaimer looks like a simplified summary (patient-friendly language)
-        if disclaimer and (
-            'simple terms' in disclaimer.lower() or 
-            'easy explanation' in disclaimer.lower() or
-            'what this means' in disclaimer.lower() or
-            'most important thing' in disclaimer.lower()
-        ):
-            data['simplifiedSummary'] = disclaimer
-            data['disclaimer'] = ''  # Clear disclaimer since it's being used for simplified summary
-        else:
-            data['simplifiedSummary'] = ''
-        
-        return data
 
 
 class PrescriptionAnalysisRequestSerializer(serializers.Serializer):

@@ -92,23 +92,17 @@ def analyze_prescription(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis - store simplified summary in disclaimer column
-        disclaimer_content = analysis_result.get('aiDisclaimer', '')
-        simplified_summary = analysis_result.get('simplifiedSummary', '')
-        
-        # If we have simplified summary, store it in disclaimer column
-        if simplified_summary:
-            disclaimer_content = simplified_summary
-        
+        # Create AI analysis - use simplified_summary column
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
+            simplified_summary=analysis_result.get('simplifiedSummary', ''),  # Use existing column
             key_findings=analysis_result['keyFindings'],
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=disclaimer_content,  # Store simplified summary here
+            disclaimer=analysis_result.get('aiDisclaimer', ''),  # Keep original disclaimer
             record_title=health_record.title
         )
         
@@ -248,23 +242,17 @@ def analyze_health_record(request):
             uploaded_by=serializer.validated_data.get('uploaded_by', 'system')
         )
         
-        # Create AI analysis - store simplified summary in disclaimer column
-        disclaimer_content = analysis_result.get('aiDisclaimer', '')
-        simplified_summary = analysis_result.get('simplifiedSummary', '')
-        
-        # If we have simplified summary, store it in disclaimer column
-        if simplified_summary:
-            disclaimer_content = simplified_summary
-        
+        # Create AI analysis - use simplified_summary column
         ai_analysis = AIAnalysis.objects.create(
             record_id=record_id,
             summary=analysis_result['summary'],
+            simplified_summary=analysis_result.get('simplifiedSummary', ''),  # Use existing column
             key_findings=analysis_result['keyFindings'],
             risk_warnings=analysis_result['riskWarnings'],
             recommendations=analysis_result['recommendations'],
             confidence=analysis_result['confidence'],
             analysis_type=analysis_result.get('analysisType', 'AI Analysis'),
-            disclaimer=disclaimer_content,  # Store simplified summary here
+            disclaimer=analysis_result.get('aiDisclaimer', ''),  # Keep original disclaimer
             record_title=health_record.title
         )
         

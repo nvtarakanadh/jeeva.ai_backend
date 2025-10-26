@@ -39,7 +39,7 @@ class AIAnalysis(models.Model):
     id = models.AutoField(primary_key=True)
     record_id = models.CharField(max_length=255)
     summary = models.TextField()
-    # simplified_summary = models.TextField(blank=True, null=True)  # Temporarily commented out
+    simplified_summary = models.TextField(blank=True, null=True)  # Re-enabled - column exists
     key_findings = models.JSONField(default=list)
     risk_warnings = models.JSONField(default=list)
     recommendations = models.JSONField(default=list)
