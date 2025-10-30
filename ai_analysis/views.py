@@ -34,11 +34,11 @@ def root_endpoint(request):
     
     # Handle OPTIONS preflight request
     if request.method == 'OPTIONS':
-        return cors_response({}, status.HTTP_200_OK)
+        return cors_response({}, status_code=status.HTTP_200_OK)
     
     # Handle HEAD request
     if request.method == 'HEAD':
-        return cors_response({}, status.HTTP_200_OK)
+        return cors_response({}, status_code=status.HTTP_200_OK)
     
     # Handle GET request
     return cors_response({
@@ -52,7 +52,7 @@ def root_endpoint(request):
             'analyze_medical_report': '/api/ai/analyze/medical-report/',
         },
         'timestamp': timezone.now().isoformat()
-    }, status.HTTP_200_OK)
+    }, status_code=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -62,14 +62,14 @@ def analyze_prescription(request):
     try:
         serializer = PrescriptionAnalysisRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return cors_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+            return cors_response(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
         
         # Get the uploaded image
         image = request.FILES.get('image')
         if not image:
             return cors_response(
                 {'error': 'No image provided'}, 
-                status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST
             )
         
         # Read image bytes
@@ -128,12 +128,12 @@ def analyze_prescription(request):
             'record_id': record_id,
             'analysis': AIAnalysisSerializer(ai_analysis).data,
             'health_record': HealthRecordSerializer(health_record).data
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         return cors_response(
             {'error': f'Analysis failed: {str(e)}'}, 
-            status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -144,12 +144,12 @@ def analyze_health_record(request):
     
     # Handle OPTIONS preflight request
     if request.method == 'OPTIONS':
-        return cors_response({}, status.HTTP_200_OK)
+        return cors_response({}, status_code=status.HTTP_200_OK)
     
     try:
         serializer = HealthRecordAnalysisRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return cors_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+            return cors_response(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
         
         # Check if this is an imaging record (MRI/CT/X-ray)
         record_type = serializer.validated_data.get('record_type', '')
@@ -179,7 +179,7 @@ def analyze_health_record(request):
             except Exception as e:
                 return cors_response(
                     {'error': f'Failed to download or analyze image: {str(e)}'}, 
-                    status.HTTP_400_BAD_REQUEST
+                    status_code=status.HTTP_400_BAD_REQUEST
                 )
         elif (file_url and is_imaging_record):
             # This is an MRI/CT/X-ray scan, use Dr7.ai API
@@ -228,7 +228,7 @@ def analyze_health_record(request):
                 # But if it does, provide a generic error message
                 return cors_response({
                     'error': f'MRI/CT scan analysis is currently unavailable. Please try again later or contact support.'
-                }, status.HTTP_500_INTERNAL_SERVER_ERROR)
+                }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
             # This is text input or other record type, use text analysis
             analysis_result = analyze_health_record_with_ai(serializer.validated_data)
@@ -294,12 +294,12 @@ def analyze_health_record(request):
             'record_id': record_id,
             'analysis': AIAnalysisSerializer(ai_analysis).data,
             'health_record': HealthRecordSerializer(health_record).data
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         return cors_response(
             {'error': f'Analysis failed: {str(e)}'}, 
-            status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -313,7 +313,7 @@ def get_analysis(request, record_id):
         if not analysis:
             return cors_response(
                 {'error': 'No analysis found for this record'}, 
-                status=status.HTTP_404_NOT_FOUND
+                status_code=status.HTTP_404_NOT_FOUND
             )
         
         # Get the health record
@@ -327,12 +327,12 @@ def get_analysis(request, record_id):
             'success': True,
             'analysis': AIAnalysisSerializer(analysis).data,
             'health_record': health_record_data
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         return cors_response(
             {'error': f'Failed to retrieve analysis: {str(e)}'}, 
-            status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -346,12 +346,12 @@ def list_analyses(request):
         return cors_response({
             'success': True,
             'analyses': serializer.data
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         return cors_response(
             {'error': f'Failed to retrieve analyses: {str(e)}'}, 
-            status.HTTP_500_INTERNAL_SERVER_ERROR
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -362,7 +362,7 @@ def health_check(request):
         'status': 'healthy',
         'message': 'Jeeva AI Backend is running',
         'timestamp': timezone.now().isoformat()
-    }, status.HTTP_200_OK)
+    }, status_code=status.HTTP_200_OK)
 
 
 # =============================================================================
@@ -395,7 +395,7 @@ def analyze_mri_ct_scan(request):
             return cors_response({
                 'error': 'Invalid request data',
                 'details': serializer.errors
-            }, status.HTTP_400_BAD_REQUEST)
+            }, status_code=status.HTTP_400_BAD_REQUEST)
         
         data = serializer.validated_data
         record_id = data['record_id']
@@ -409,7 +409,7 @@ def analyze_mri_ct_scan(request):
             return cors_response({
                 'message': 'Analysis already exists for this record',
                 'analysis': existing_analysis
-            }, status.HTTP_200_OK)
+            }, status_code=status.HTTP_200_OK)
         
         # Get image data
         image_bytes = None
@@ -422,7 +422,7 @@ def analyze_mri_ct_scan(request):
             except Exception as e:
                 return cors_response({
                     'error': f'Failed to download image: {str(e)}'
-                }, status.HTTP_400_BAD_REQUEST)
+                }, status_code=status.HTTP_400_BAD_REQUEST)
         elif 'image_file' in request.FILES:
             # Get image from uploaded file
             image_file = request.FILES['image_file']
@@ -430,7 +430,7 @@ def analyze_mri_ct_scan(request):
         else:
             return cors_response({
                 'error': 'Either image_url or image_file must be provided'
-            }, status.HTTP_400_BAD_REQUEST)
+            }, status_code=status.HTTP_400_BAD_REQUEST)
         
         # Analyze the scan using Dr7.ai
         print(f"🔍 Starting {scan_type} analysis for record {record_id}")
@@ -461,13 +461,13 @@ def analyze_mri_ct_scan(request):
         return cors_response({
             'message': f'{scan_type} scan analysis completed successfully',
             'analysis': response_serializer.data
-        }, status.HTTP_201_CREATED)
+        }, status_code=status.HTTP_201_CREATED)
         
     except Exception as e:
         print(f"❌ Error in MRI/CT analysis: {str(e)}")
         return cors_response({
             'error': f'Analysis failed: {str(e)}'
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -485,17 +485,17 @@ def get_mri_ct_analysis(request, record_id):
         if not analysis:
             return cors_response({
                 'error': 'Analysis not found for this record'
-            }, status.HTTP_404_NOT_FOUND)
+            }, status_code=status.HTTP_404_NOT_FOUND)
         
         return cors_response({
             'analysis': analysis
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error retrieving MRI/CT analysis: {str(e)}")
         return cors_response({
             'error': f'Failed to retrieve analysis: {str(e)}'
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -517,7 +517,7 @@ def list_mri_ct_analyses(request):
         if not patient_id:
             return cors_response({
                 'error': 'patient_id parameter is required'
-            }, status.HTTP_400_BAD_REQUEST)
+            }, status_code=status.HTTP_400_BAD_REQUEST)
         
         # Build query
         queryset = MRI_CT_Analysis.objects.filter(patient_id=patient_id)
@@ -531,13 +531,13 @@ def list_mri_ct_analyses(request):
         return cors_response({
             'analyses': serializer.data,
             'count': len(serializer.data)
-        }, status.HTTP_200_OK)
+        }, status_code=status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error listing MRI/CT analyses: {str(e)}")
         return cors_response({
             'error': f'Failed to list analyses: {str(e)}'
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['PUT'])
@@ -557,7 +557,7 @@ def update_doctor_access(request, record_id):
         if doctor_access is None:
             return cors_response({
                 'error': 'doctor_access field is required'
-            }, status.HTTP_400_BAD_REQUEST)
+            }, status_code=status.HTTP_400_BAD_REQUEST)
         
         try:
             analysis = MRI_CT_Analysis.objects.get(record_id=record_id)
@@ -570,15 +570,15 @@ def update_doctor_access(request, record_id):
             return cors_response({
                 'message': 'Doctor access updated successfully',
                 'analysis': serializer.data
-            }, status.HTTP_200_OK)
+            }, status_code=status.HTTP_200_OK)
             
         except MRI_CT_Analysis.DoesNotExist:
             return cors_response({
                 'error': 'Analysis not found for this record'
-            }, status.HTTP_404_NOT_FOUND)
+            }, status_code=status.HTTP_404_NOT_FOUND)
         
     except Exception as e:
         print(f"❌ Error updating doctor access: {str(e)}")
         return cors_response({
             'error': f'Failed to update doctor access: {str(e)}'
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
