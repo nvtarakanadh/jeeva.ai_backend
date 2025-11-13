@@ -1,6 +1,6 @@
 # 🩻 MRI/CT Scan Analysis with Dr7.ai API
 
-This document describes the implementation of MRI/CT scan analysis features using the Dr7.ai API in the Jeeva.AI project.
+This document describes the implementation of MRI/CT scan analysis features using the Dr7.ai API in the Jeeva.Tech project.
 
 ## 🎯 Overview
 

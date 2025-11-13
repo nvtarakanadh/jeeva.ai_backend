@@ -42,7 +42,7 @@ def root_endpoint(request):
     
     # Handle GET request
     return cors_response({
-        'message': 'Jeeva AI Backend API',
+        'message': 'Jeeva Tech Backend API',
         'version': '1.0.0',
         'status': 'running',
         'endpoints': {
@@ -360,7 +360,7 @@ def health_check(request):
     """Health check endpoint"""
     return cors_response({
         'status': 'healthy',
-        'message': 'Jeeva AI Backend is running',
+        'message': 'Jeeva Tech Backend is running',
         'timestamp': timezone.now().isoformat()
     }, status_code=status.HTTP_200_OK)
 

@@ -1,6 +1,6 @@
-# Jeeva AI Backend
+# Jeeva Tech Backend
 
-This is the Django backend for the Jeeva AI healthcare application, providing AI-powered analysis of medical records and prescriptions.
+This is the Django backend for the Jeeva Tech healthcare application, providing AI-powered analysis of medical records and prescriptions.
 
 ## Features
 
@@ -52,7 +52,7 @@ This is the Django backend for the Jeeva AI healthcare application, providing AI
    ALLOWED_HOSTS=localhost,127.0.0.1
    GEMINI_API_KEY=your-gemini-api-key-here
    FIRECRAWL_API_KEY=your-firecrawl-api-key-here
-   CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+   CORS_ALLOWED_ORIGINS=https://jeeva-tech.vercel.app,http://localhost:3000,http://127.0.0.1:3000
    ```
 
 5. **Run migrations:**
@@ -170,7 +170,7 @@ const result = await response.json();
 
 ### CORS Configuration
 
-The backend is configured to allow requests from the frontend. Update `CORS_ALLOWED_ORIGINS` in your `.env` file to include your frontend URL.
+The backend is configured to allow requests from the frontend. Update `CORS_ALLOWED_ORIGINS` in your `.env` file to include your frontend URL (e.g., `https://jeeva-tech.vercel.app` for production).
 
 ## Development
 
