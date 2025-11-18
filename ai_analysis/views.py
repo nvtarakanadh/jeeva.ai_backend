@@ -12,18 +12,26 @@ from .serializers import (
     HealthRecordSerializer, 
     AIAnalysisSerializer,
     PrescriptionAnalysisRequestSerializer,
-    HealthRecordAnalysisRequestSerializer
+    HealthRecordAnalysisRequestSerializer,
+    ConsentCreateSerializer
 )
 from .ai_services import analyze_prescription_with_gemini, analyze_health_record_with_ai
 
 
 def cors_response(data, status_code=200):
-    """Helper function to add CORS headers to responses"""
+    """Helper function to add CORS headers to responses
+    
+    Note: CORS headers are primarily handled by django-cors-headers middleware.
+    This function adds additional headers if needed, but the middleware should
+    handle Access-Control-Allow-Origin based on CORS_ALLOWED_ORIGINS setting.
+    """
     response = Response(data, status=status_code)
-    response['Access-Control-Allow-Origin'] = '*'
+    # Don't set Access-Control-Allow-Origin here - let the middleware handle it
+    # Setting it to '*' conflicts with CORS_ALLOW_CREDENTIALS = True
+    # The middleware will set the correct origin based on CORS_ALLOWED_ORIGINS
     response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, HEAD'
     response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept, Origin'
-    response['Access-Control-Allow-Credentials'] = 'true'
+    # Credentials header is handled by middleware based on CORS_ALLOW_CREDENTIALS setting
     response['Access-Control-Max-Age'] = '86400'
     return response
 
@@ -50,6 +58,7 @@ def root_endpoint(request):
             'analyze_prescription': '/api/ai/analyze/prescription/',
             'analyze_health_record': '/api/ai/analyze/health-record/',
             'analyze_medical_report': '/api/ai/analyze/medical-report/',
+            'create_consent': '/api/ai/consent/create/',
         },
         'timestamp': timezone.now().isoformat()
     }, status_code=status.HTTP_200_OK)
@@ -581,4 +590,85 @@ def update_doctor_access(request, record_id):
         print(f"❌ Error updating doctor access: {str(e)}")
         return cors_response({
             'error': f'Failed to update doctor access: {str(e)}'
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# CONSENT MANAGEMENT VIEWS
+# =============================================================================
+
+@api_view(['POST', 'OPTIONS'])
+@parser_classes([JSONParser])
+def create_consent(request):
+    """
+    Create a consent record in health records
+    
+    This endpoint allows doctors to create consent records that will appear
+    in the patient's health records.
+    
+    Expected payload:
+    {
+        "patient_id": "uuid",
+        "title": "Consent Title",
+        "description": "Consent description/details",
+        "consent_date": "2024-01-01T00:00:00Z",
+        "file_url": "https://...",  // Optional
+        "file_name": "consent.pdf",  // Optional
+        "uploaded_by": "doctor-id",
+        "record_id": "uuid",  // Optional, will be generated if not provided
+        "metadata": {}  // Optional, for additional consent details
+    }
+    """
+    # Handle OPTIONS preflight request
+    if request.method == 'OPTIONS':
+        return cors_response({}, status_code=status.HTTP_200_OK)
+    
+    try:
+        serializer = ConsentCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return cors_response({
+                'error': 'Invalid request data',
+                'details': serializer.errors
+            }, status_code=status.HTTP_400_BAD_REQUEST)
+        
+        # Use the record ID from the frontend if provided, otherwise create a new one
+        record_id = serializer.validated_data.get('record_id') or str(uuid.uuid4())
+        
+        # Convert consent_date string to datetime object
+        consent_date_str = serializer.validated_data['consent_date']
+        try:
+            # Try parsing ISO format first
+            record_date = datetime.fromisoformat(consent_date_str.replace('Z', '+00:00'))
+        except ValueError:
+            # Fallback to current time if parsing fails
+            record_date = timezone.now()
+        
+        # Create health record with consent type
+        health_record = HealthRecord.objects.create(
+            id=record_id,
+            patient_id=serializer.validated_data['patient_id'],
+            record_type='consent',
+            title=serializer.validated_data['title'],
+            description=serializer.validated_data.get('description', ''),
+            file_url=serializer.validated_data.get('file_url'),
+            file_name=serializer.validated_data.get('file_name'),
+            file_type=serializer.validated_data.get('file_name', '').split('.')[-1] if serializer.validated_data.get('file_name') else None,
+            record_date=record_date,
+            uploaded_by=serializer.validated_data['uploaded_by'],
+            metadata=serializer.validated_data.get('metadata', {})
+        )
+        
+        print(f"✅ Consent record created: {record_id} for patient {serializer.validated_data['patient_id']}")
+        
+        return cors_response({
+            'success': True,
+            'message': 'Consent record created successfully',
+            'record_id': record_id,
+            'health_record': HealthRecordSerializer(health_record).data
+        }, status_code=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        print(f"❌ Error creating consent record: {str(e)}")
+        return cors_response({
+            'error': f'Failed to create consent record: {str(e)}'
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

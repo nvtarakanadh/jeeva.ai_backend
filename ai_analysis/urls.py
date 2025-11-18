@@ -14,4 +14,7 @@ urlpatterns = [
     path('mri-ct-analysis/<str:record_id>/', views.get_mri_ct_analysis, name='get_mri_ct_analysis'),
     path('mri-ct-analyses/', views.list_mri_ct_analyses, name='list_mri_ct_analyses'),
     path('mri-ct-analysis/<str:record_id>/doctor-access/', views.update_doctor_access, name='update_doctor_access'),
+    
+    # Consent management endpoints
+    path('consent/create/', views.create_consent, name='create_consent'),
 ]

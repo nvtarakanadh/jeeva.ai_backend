@@ -166,7 +166,9 @@ REST_FRAMEWORK = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'https://jeeva-tech.vercel.app,http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081').split(',')
+# Parse CORS origins from environment variable, trimming whitespace
+cors_origins_str = os.getenv('CORS_ALLOWED_ORIGINS', 'https://www.jeeva.tech,https://jeeva.tech,https://jeeva-tech.vercel.app,http://localhost:8080,http://127.0.0.1:8080,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
 CORS_ALLOWED_HEADERS = [

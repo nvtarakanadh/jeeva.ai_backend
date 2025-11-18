@@ -99,3 +99,16 @@ class MRI_CT_AnalysisResponseSerializer(serializers.Serializer):
     api_usage_tokens = serializers.IntegerField()
     created_at = serializers.DateTimeField()
     disclaimer = serializers.CharField()
+
+
+class ConsentCreateSerializer(serializers.Serializer):
+    """Serializer for creating consent records"""
+    patient_id = serializers.CharField(max_length=255, required=True)
+    title = serializers.CharField(max_length=255, required=True)
+    description = serializers.CharField(required=False, default="", allow_blank=True)
+    consent_date = serializers.CharField(required=True)  # ISO format date string
+    file_url = serializers.URLField(required=False, allow_blank=True)
+    file_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    uploaded_by = serializers.CharField(max_length=255, required=True)  # Doctor ID
+    record_id = serializers.CharField(max_length=255, required=False, allow_blank=True)  # Optional, will be generated if not provided
+    metadata = serializers.JSONField(required=False, default=dict)  # For additional consent details

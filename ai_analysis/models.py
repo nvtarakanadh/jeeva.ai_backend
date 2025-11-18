@@ -10,6 +10,7 @@ class HealthRecord(models.Model):
         ('imaging', 'Imaging'),
         ('consultation', 'Consultation'),
         ('vaccination', 'Vaccination'),
+        ('consent', 'Consent'),
         ('other', 'Other'),
     ]
     
