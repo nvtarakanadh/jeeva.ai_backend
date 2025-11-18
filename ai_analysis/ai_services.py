@@ -1075,10 +1075,29 @@ def generate_prescription_recommendations_with_gemini(model, medicine_info: Dict
         Make recommendations specific to the actual medicines prescribed, not generic advice.
         """
         
-        response = model.generate_content([
-            "You are a clinical pharmacist providing evidence-based medication recommendations. Focus on patient safety, monitoring requirements, and specific guidance for each medicine.",
-            recommendations_prompt
-        ])
+        # Configure generation with timeout
+        generation_config = {
+            'max_output_tokens': 8192,
+        }
+        
+        try:
+            response = model.generate_content(
+                [
+                    "You are a clinical pharmacist providing evidence-based medication recommendations. Focus on patient safety, monitoring requirements, and specific guidance for each medicine.",
+                    recommendations_prompt
+                ],
+                generation_config=generation_config,
+                request_options={'timeout': 60}  # 60 second timeout for API call
+            )
+        except Exception as e:
+            error_msg = str(e)
+            print(f"WARNING Error calling Gemini API for prescription recommendations: {error_msg}")
+            if 'timeout' in error_msg.lower() or '504' in error_msg or 'deadline' in error_msg.lower():
+                print("⚠️ Recommendations generation timed out, using fallback recommendations")
+                # Fallback to medicine-specific recommendations
+                return generate_medicine_specific_recommendations(medicine_info, medicine_names)
+            # For other errors, also use fallback
+            return generate_medicine_specific_recommendations(medicine_info, medicine_names)
         
         # Parse AI recommendations
         try:
@@ -1556,13 +1575,29 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
             # Initialize Gemini model
             model = genai.GenerativeModel('gemini-2.5-flash')
             
+            # Configure generation with timeout
+            generation_config = {
+                'max_output_tokens': 8192,
+            }
+            
             # Extract medicine names from text (adapted from original model)
-            response = model.generate_content([
-                "You are MedGuide AI. Extract ALL medicine names from the prescription text. "
-                "Return ONLY a JSON array of medicine names found in the prescription. "
-                "Example: [\"Medicine1\", \"Medicine2\", \"Medicine3\"]",
-                f"Prescription Text: {description}"
-            ])
+            try:
+                response = model.generate_content(
+                    [
+                        "You are MedGuide AI. Extract ALL medicine names from the prescription text. "
+                        "Return ONLY a JSON array of medicine names found in the prescription. "
+                        "Example: [\"Medicine1\", \"Medicine2\", \"Medicine3\"]",
+                        f"Prescription Text: {description}"
+                    ],
+                    generation_config=generation_config,
+                    request_options={'timeout': 60}  # 60 second timeout for API call
+                )
+            except Exception as e:
+                error_msg = str(e)
+                print(f"WARNING Error calling Gemini API for medicine extraction from text: {error_msg}")
+                if 'timeout' in error_msg.lower() or '504' in error_msg or 'deadline' in error_msg.lower():
+                    raise ValueError(f"504 The request timed out. Please try again.")
+                raise ValueError(f"Failed to extract medicines from prescription text: {error_msg}")
             
             # Extract medicine names from response
             medicine_names_text = response.text.strip()
@@ -1644,14 +1679,32 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
             Focus on medical safety and health insights rather than commercial information.
             """
             
-            report_response = model.generate_content([
-                "You are a medical assistant. Create detailed, professional medical reports about medicines. Focus on safety, health insights, and medical guidance. Always include medical disclaimers and emphasize consulting healthcare providers.",
-                report_prompt
-            ])
-            final_report = report_response.text
+            try:
+                report_response = model.generate_content(
+                    [
+                        "You are a medical assistant. Create detailed, professional medical reports about medicines. Focus on safety, health insights, and medical guidance. Always include medical disclaimers and emphasize consulting healthcare providers.",
+                        report_prompt
+                    ],
+                    generation_config=generation_config,
+                    request_options={'timeout': 60}  # 60 second timeout for API call
+                )
+                final_report = report_response.text
+            except Exception as e:
+                error_msg = str(e)
+                print(f"WARNING Error generating prescription report: {error_msg}")
+                if 'timeout' in error_msg.lower() or '504' in error_msg or 'deadline' in error_msg.lower():
+                    raise ValueError(f"504 The request timed out. Please try again.")
+                # Use a fallback report if generation fails
+                final_report = f"Prescription analysis for {title}. Medicines identified: {', '.join(medicine_names)}. Please consult your healthcare provider for detailed information."
+            
+            # Create simplified summary (first 200 words of the detailed report or a concise summary)
+            simplified_summary = final_report[:500] if len(final_report) > 500 else final_report
+            if len(final_report) > 500:
+                simplified_summary = simplified_summary.rsplit(' ', 1)[0] + "..."
             
             return {
-                "summary": f"Comprehensive prescription analysis for {title}. AI has identified {len(medicine_names)} medication(s) requiring detailed review and monitoring.",
+                "summary": f"Comprehensive prescription analysis for {title}. AI has identified {len(medicine_names)} medication(s): {', '.join(medicine_names[:5])}{' and more' if len(medicine_names) > 5 else ''}. Each medication requires careful review for dosage, interactions, and monitoring requirements.",
+                "simplifiedSummary": simplified_summary,
                 "keyFindings": [
                     f"Prescription contains {len(medicine_names)} medication(s): {', '.join(medicine_names)}",
                     "Dosage and frequency information documented",
@@ -1667,6 +1720,7 @@ def analyze_health_record_with_ai(record_data: Dict) -> Dict:
                 "recommendations": evidence_based_recommendations,
                 "confidence": 0.85,
                 "analysisType": "Gemini AI Prescription Analysis",
+                "aiDisclaimer": "⚠️ **AI Analysis Disclaimer**: This prescription analysis is generated by AI and is for informational purposes only. Always consult your healthcare provider or pharmacist for personalized medical advice and to verify medication information.",
                 "detailedReport": final_report,
                 "medicineInfo": medicine_info
             }
