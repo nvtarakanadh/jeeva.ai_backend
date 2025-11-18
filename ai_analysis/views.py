@@ -160,8 +160,16 @@ def analyze_health_record(request):
         if not serializer.is_valid():
             return cors_response(serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
         
-        # Check if this is an imaging record (MRI/CT/X-ray)
+        # Check if this is a consent record - consents don't support AI analysis
         record_type = serializer.validated_data.get('record_type', '')
+        if record_type == 'consent':
+            return cors_response({
+                'error': 'Consent records do not support AI analysis. Consents are legal documents and should not be analyzed by AI.',
+                'record_type': 'consent',
+                'message': 'AI analysis is not available for consent records'
+            }, status_code=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if this is an imaging record (MRI/CT/X-ray)
         file_url = serializer.validated_data.get('file_url', '')
         title = serializer.validated_data.get('title', '').lower()
         file_name = serializer.validated_data.get('file_name', '').lower()
