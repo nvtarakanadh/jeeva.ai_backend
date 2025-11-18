@@ -149,20 +149,32 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
         # Initialize Gemini model
         model = genai.GenerativeModel('gemini-2.5-flash')
 
+        # Configure generation with timeout
+        generation_config = {
+            'max_output_tokens': 8192,
+        }
+
         # First call to extract medicine names with enhanced error handling
         try:
-            response = model.generate_content([
-                "You are MedGuide AI. Extract ALL medicine names from the prescription image. "
-                "Return ONLY a JSON array of medicine names found in the prescription. "
-                "Example: [\"Medicine1\", \"Medicine2\", \"Medicine3\"]",
-                {
-                    "mime_type": mime_type,
-                    "data": image_bytes
-                }
-            ])
+            response = model.generate_content(
+                [
+                    "You are MedGuide AI. Extract ALL medicine names from the prescription image. "
+                    "Return ONLY a JSON array of medicine names found in the prescription. "
+                    "Example: [\"Medicine1\", \"Medicine2\", \"Medicine3\"]",
+                    {
+                        "mime_type": mime_type,
+                        "data": image_bytes
+                    }
+                ],
+                generation_config=generation_config,
+                request_options={'timeout': 60}  # 60 second timeout for API call
+            )
         except Exception as e:
-            print(f"WARNING Error calling Gemini API for medicine extraction: {e}")
-            raise ValueError(f"Failed to analyze image with AI: {str(e)}")
+            error_msg = str(e)
+            print(f"WARNING Error calling Gemini API for medicine extraction: {error_msg}")
+            if 'timeout' in error_msg.lower() or '504' in error_msg or 'deadline' in error_msg.lower():
+                raise ValueError(f"504 The request timed out. Please try again.")
+            raise ValueError(f"Failed to analyze image with AI: {error_msg}")
 
         # Extract medicine names from response
         medicine_names_text = response.text.strip()
@@ -248,13 +260,20 @@ def analyze_prescription_with_gemini(image_bytes) -> Dict:
         """
 
         try:
-            analysis_response = model.generate_content([
-                "You are a medical AI assistant. Analyze prescriptions and return structured JSON data. Focus on patient safety and medical accuracy.",
-                analysis_prompt
-            ])
+            analysis_response = model.generate_content(
+                [
+                    "You are a medical AI assistant. Analyze prescriptions and return structured JSON data. Focus on patient safety and medical accuracy.",
+                    analysis_prompt
+                ],
+                generation_config=generation_config,
+                request_options={'timeout': 60}  # 60 second timeout for API call
+            )
         except Exception as e:
-            print(f"WARNING Error calling Gemini API for analysis: {e}")
-            raise ValueError(f"Failed to generate analysis: {str(e)}")
+            error_msg = str(e)
+            print(f"WARNING Error calling Gemini API for analysis: {error_msg}")
+            if 'timeout' in error_msg.lower() or '504' in error_msg or 'deadline' in error_msg.lower():
+                raise ValueError(f"504 The request timed out. Please try again.")
+            raise ValueError(f"Failed to generate analysis: {error_msg}")
         
         try:
             # Parse the JSON response

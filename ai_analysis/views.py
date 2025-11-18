@@ -186,27 +186,75 @@ def analyze_health_record(request):
             record_type == 'prescription'):
             # This is a prescription image upload, use prescription analysis
             try:
-                # Download the image from the URL
-                image_response = requests.get(file_url)
-                image_response.raise_for_status()
-                image_bytes = image_response.content
+                # Download the image from the URL with timeout
+                try:
+                    image_response = requests.get(file_url, timeout=30)  # 30 second timeout
+                    image_response.raise_for_status()
+                    image_bytes = image_response.content
+                    
+                    # Check image size (limit to 10MB to prevent memory issues)
+                    if len(image_bytes) > 10 * 1024 * 1024:
+                        return cors_response(
+                            {'error': 'Image file is too large. Maximum size is 10MB. Please use a smaller image.'}, 
+                            status_code=status.HTTP_400_BAD_REQUEST
+                        )
+                except requests.exceptions.Timeout:
+                    return cors_response(
+                        {'error': 'Request timed out while downloading the image. Please try again with a smaller image or check your internet connection.'}, 
+                        status_code=status.HTTP_408_REQUEST_TIMEOUT
+                    )
+                except requests.exceptions.RequestException as e:
+                    return cors_response(
+                        {'error': f'Failed to download image: {str(e)}'}, 
+                        status_code=status.HTTP_400_BAD_REQUEST
+                    )
                 
                 # Analyze prescription using Gemini AI (original model)
-                analysis_result = analyze_prescription_with_gemini(image_bytes)
+                try:
+                    analysis_result = analyze_prescription_with_gemini(image_bytes)
+                except Exception as e:
+                    error_msg = str(e)
+                    if 'timeout' in error_msg.lower() or '504' in error_msg:
+                        return cors_response(
+                            {'error': 'AI analysis timed out. The image may be too complex or the service is temporarily unavailable. Please try again later or use a simpler image.'}, 
+                            status_code=status.HTTP_504_GATEWAY_TIMEOUT
+                        )
+                    return cors_response(
+                        {'error': f'Failed to analyze image with AI: {error_msg}'}, 
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             except Exception as e:
                 return cors_response(
-                    {'error': f'Failed to download or analyze image: {str(e)}'}, 
-                    status_code=status.HTTP_400_BAD_REQUEST
+                    {'error': f'Failed to process prescription image: {str(e)}'}, 
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
         elif (file_url and is_imaging_record):
             # This is an MRI/CT/X-ray scan, use Dr7.ai API
             try:
                 from .ai_services import analyze_mri_ct_scan_with_dr7_new as analyze_mri_ct_scan_with_dr7
                 
-                # Download the image from the URL
-                image_response = requests.get(file_url)
-                image_response.raise_for_status()
-                image_bytes = image_response.content
+                # Download the image from the URL with timeout
+                try:
+                    image_response = requests.get(file_url, timeout=30)  # 30 second timeout
+                    image_response.raise_for_status()
+                    image_bytes = image_response.content
+                    
+                    # Check image size (limit to 10MB to prevent memory issues)
+                    if len(image_bytes) > 10 * 1024 * 1024:
+                        return cors_response(
+                            {'error': 'Image file is too large. Maximum size is 10MB. Please use a smaller image.'}, 
+                            status_code=status.HTTP_400_BAD_REQUEST
+                        )
+                except requests.exceptions.Timeout:
+                    return cors_response(
+                        {'error': 'Request timed out while downloading the image. Please try again with a smaller image or check your internet connection.'}, 
+                        status_code=status.HTTP_408_REQUEST_TIMEOUT
+                    )
+                except requests.exceptions.RequestException as e:
+                    return cors_response(
+                        {'error': f'Failed to download image: {str(e)}'}, 
+                        status_code=status.HTTP_400_BAD_REQUEST
+                    )
                 
                 # Determine scan type
                 scan_type = 'MRI'  # default
