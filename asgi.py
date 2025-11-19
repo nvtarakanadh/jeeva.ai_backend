@@ -11,6 +11,6 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'jeeva_ai_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Jeeva_AI_BackEnd.settings')
 
 application = get_asgi_application()
