@@ -18,7 +18,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-# Since manage.py is now in Jeeva_AI_BackEnd, BASE_DIR should point to parent (root) to access ai_analysis app
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -68,7 +67,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'Jeeva_AI_BackEnd.urls'
+ROOT_URLCONF = 'jeeva_ai_backend.urls'
 
 TEMPLATES = [
     {
@@ -85,7 +84,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Jeeva_AI_BackEnd.wsgi.application'
+WSGI_APPLICATION = 'jeeva_ai_backend.wsgi.application'
 
 
 # Database
